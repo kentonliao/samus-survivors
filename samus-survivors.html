@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAMUS SURVIVORS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-void:#05070c;
+    --bg-panel:#0c1220;
+    --line-cyan:#4fd8ff;
+    --line-cyan-dim:#1c5a6e;
+    --suit-orange:#ff7b3d;
+    --suit-orange-dim:#a34a1f;
+    --hp-red:#ff3b3b;
+    --gold:#ffd76a;
+    --text-main:#dfe8f0;
+    --text-dim:#7d8ba0;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;height:100%;
+    background:#000;
+    font-family:'Share Tech Mono',monospace;
+    color:var(--text-main);
+    overflow:hidden;
+    -webkit-user-select:none;user-select:none;
+  }
+  #app{
+    position:relative;
+    width:100vw;height:100vh;
+    display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at center, #0a0f1a 0%, #000000 100%);
+  }
+  #stage{
+    position:relative;
+    width:960px;height:600px;
+    max-width:100vw;max-height:100vh;
+    aspect-ratio:960/600;
+    box-shadow:0 0 0 2px var(--line-cyan-dim), 0 0 40px rgba(79,216,255,0.15);
+  }
+  canvas{
+    position:absolute;top:0;left:0;
+    width:100%;height:100%;
+    image-rendering:pixelated;
+    image-rendering:crisp-edges;
+    display:block;
+    background:#05070c;
+  }
+  .pixel-font{ font-family:'Press Start 2P', monospace; }
+
+  /* ---------- HUD ---------- */
+  #hud{
+    position:absolute;top:0;left:0;width:100%;height:100%;
+    pointer-events:none;
+    z-index:5;
+  }
+  .hud-corner{
+    position:absolute;
+    padding:10px 14px;
+    background:linear-gradient(135deg, rgba(12,18,32,0.85), rgba(12,18,32,0.55));
+    border:1px solid var(--line-cyan-dim);
+    clip-path:polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+  }
+  #hp-wrap{ top:14px; left:14px; width:230px; }
+  #hp-label{ font-family:'Press Start 2P'; font-size:9px; color:var(--line-cyan); letter-spacing:1px; margin-bottom:6px; display:flex; justify-content:space-between;}
+  #hp-bar-outer{ height:14px; background:#0a0e18; border:1px solid var(--line-cyan-dim); position:relative; overflow:hidden;}
+  #hp-bar-inner{ height:100%; width:100%; background:linear-gradient(90deg,#ff5b3d,#ffb03d); transition:width 0.15s linear; }
+  #hp-segments{ position:absolute; top:0;left:0;width:100%;height:100%; background-image:repeating-linear-gradient(90deg, transparent 0, transparent 18px, rgba(0,0,0,0.5) 18px, rgba(0,0,0,0.5) 20px); }
+
+  #timer-wrap{ top:14px; right:14px; text-align:right; clip-path:polygon(10px 0,100% 0,100% 100%,0 100%,0 10px); }
+  #timer-txt{ font-family:'Press Start 2P'; font-size:16px; color:var(--gold); }
+  #depth-txt{ font-size:11px; color:var(--text-dim); margin-top:4px; }
+
+  #xp-wrap{ bottom:14px; left:50%; transform:translateX(-50%); width:420px; text-align:center; clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 100%,0 100%);}
+  #xp-bar-outer{ height:8px; background:#0a0e18; border:1px solid var(--suit-orange-dim); margin-top:4px;}
+  #xp-bar-inner{ height:100%; width:0%; background:linear-gradient(90deg,#4fd8ff,#7effe0); transition:width 0.2s ease;}
+  #level-txt{ font-family:'Press Start 2P'; font-size:10px; color:var(--suit-orange); }
+
+  #suit-wrap{ bottom:14px; right:14px; text-align:right; }
+  #suit-name{ font-family:'Press Start 2P'; font-size:9px; color:var(--suit-orange); }
+
+  /* ---------- Overlays ---------- */
+  .overlay{
+    position:absolute;top:0;left:0;width:100%;height:100%;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(3,5,10,0.92);
+    z-index:20;
+    text-align:center;
+    padding:20px;
+  }
+  .hidden{ display:none !important; }
+  .title-main{ font-family:'Press Start 2P'; font-size:38px; color:var(--suit-orange); text-shadow:0 0 18px rgba(255,123,61,0.6), 0 0 2px #fff; letter-spacing:2px; }
+  .title-sub{ font-family:'Press Start 2P'; font-size:13px; color:var(--line-cyan); margin-top:14px; letter-spacing:3px; }
+  .blink{ animation:blink 1.2s steps(2) infinite; }
+  @keyframes blink{ 50%{opacity:0.15;} }
+  .flavor{ margin-top:26px; max-width:520px; font-size:13px; line-height:1.9; color:var(--text-dim); }
+  .flavor b{ color:var(--text-main); }
+  .start-btn{
+    margin-top:34px; pointer-events:all; cursor:pointer;
+    font-family:'Press Start 2P'; font-size:13px;
+    background:linear-gradient(180deg,#ff7b3d,#c24d1f);
+    color:#1a0d05; padding:14px 30px; border:2px solid #ffd0a8;
+    box-shadow:0 0 22px rgba(255,123,61,0.5);
+    clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%);
+  }
+  .start-btn:hover{ background:linear-gradient(180deg,#ff9a63,#d95f28); }
+
+  #gameover-title{ font-family:'Press Start 2P'; font-size:26px; color:var(--hp-red); text-shadow:0 0 16px rgba(255,59,59,0.6); }
+  .stat-row{ font-size:14px; margin:6px 0; color:var(--text-main); }
+  .stat-row span{ color:var(--gold); }
+
+  /* ---------- Level Up Cards ---------- */
+  #levelup-overlay{ background:rgba(3,5,10,0.88); }
+  #levelup-title{ font-family:'Press Start 2P'; font-size:20px; color:var(--line-cyan); margin-bottom:30px; text-shadow:0 0 12px rgba(79,216,255,0.6);}
+  #cards{ display:flex; gap:22px; pointer-events:all; flex-wrap:wrap; justify-content:center; max-width:900px;}
+  .card{
+    width:220px; min-height:260px;
+    background:linear-gradient(160deg, #16202f, #0a0f18);
+    border:2px solid var(--line-cyan-dim);
+    padding:18px 14px;
+    cursor:pointer;
+    display:flex; flex-direction:column; align-items:center;
+    clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%);
+    transition:transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+  }
+  .card:hover{ transform:translateY(-6px); border-color:var(--suit-orange); box-shadow:0 8px 26px rgba(255,123,61,0.25);}
+  .card-icon{ width:64px; height:64px; margin-bottom:14px; }
+  .card-name{ font-family:'Press Start 2P'; font-size:11px; color:var(--suit-orange); text-align:center; line-height:1.6; margin-bottom:10px;}
+  .card-lv{ font-size:11px; color:var(--line-cyan); margin-bottom:10px;}
+  .card-desc{ font-size:12px; color:var(--text-dim); line-height:1.6; text-align:center;}
+  .card.new{ border-color:var(--gold); }
+  .card.new .card-name{ color:var(--gold); }
+  .card.evo{ border-color:#ff59e0; }
+  .card.evo .card-name{ color:#ff59e0; }
+
+  #flash{
+    position:absolute;top:0;left:0;width:100%;height:100%;
+    background:#fff; opacity:0; pointer-events:none; z-index:15;
+  }
+  #controls-hint{
+    position:absolute; bottom:8px; left:50%; transform:translateX(-50%);
+    font-size:10px; color:var(--text-dim); z-index:5; pointer-events:none;
+    letter-spacing:1px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="game" width="960" height="600"></canvas>
+    <div id="flash"></div>
+
+    <div id="hud">
+      <div id="hp-wrap" class="hud-corner">
+        <div id="hp-label"><span>ENERGY</span><span id="hp-num">99/99</span></div>
+        <div id="hp-bar-outer"><div id="hp-bar-inner"></div><div id="hp-segments"></div></div>
+      </div>
+      <div id="timer-wrap" class="hud-corner">
+        <div id="timer-txt">00:00</div>
+        <div id="depth-txt">CRATERIA SURFACE</div>
+      </div>
+      <div id="xp-wrap" class="hud-corner">
+        <div id="level-txt">LV. 1</div>
+        <div id="xp-bar-outer"><div id="xp-bar-inner"></div></div>
+      </div>
+      <div id="suit-wrap" class="hud-corner">
+        <div id="suit-name">POWER SUIT</div>
+      </div>
+    </div>
+    <div id="controls-hint">WASD / 方向鍵 移動　．　自動開火</div>
+
+    <!-- START SCREEN -->
+    <div id="start-overlay" class="overlay">
+      <div class="title-main">SAMUS<br>SURVIVORS</div>
+      <div class="title-sub blink">— PRESS START —</div>
+      <div class="flavor">
+        薩姆斯的護衛艦墜落於札貝斯星表層。<br>
+        <b>擊敗敵人、吸收能量結晶、開啟丘卓寶箱</b>，<br>
+        隨著動力服與武器不斷進化，在無盡的星際生物潮中存活下去。
+      </div>
+      <div class="start-btn" id="btn-start">開始遊戲</div>
+    </div>
+
+    <!-- LEVEL UP -->
+    <div id="levelup-overlay" class="overlay hidden">
+      <div id="levelup-title">能量吸收 ─ 選擇升級</div>
+      <div id="cards"></div>
+    </div>
+
+    <!-- GAME OVER -->
+    <div id="gameover-overlay" class="overlay hidden">
+      <div id="gameover-title">ENERGY DEPLETED</div>
+      <div style="margin-top:22px;">
+        <div class="stat-row">存活時間　<span id="go-time">00:00</span></div>
+        <div class="stat-row">到達等級　<span id="go-level">1</span></div>
+        <div class="stat-row">最終型態　<span id="go-suit">POWER SUIT</span></div>
+      </div>
+      <div class="start-btn" id="btn-restart" style="margin-top:30px;">重新挑戰</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* =========================================================
+   基本設定
+========================================================= */
+const W = 960, H = 600;
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+const $ = (id)=>document.getElementById(id);
+const hpNum = $('hp-num'), hpBar = $('hp-bar-inner');
+const timerTxt = $('timer-txt'), levelTxt = $('level-txt'), xpBar = $('xp-bar-inner');
+const suitNameEl = $('suit-name');
+const startOverlay = $('start-overlay'), levelupOverlay = $('levelup-overlay');
+const gameoverOverlay = $('gameover-overlay'), cardsEl = $('cards');
+const flashEl = $('flash');
+
+function rand(a,b){ return a + Math.random()*(b-a); }
+function randInt(a,b){ return Math.floor(rand(a,b+1)); }
+function dist2(x1,y1,x2,y2){ const dx=x1-x2, dy=y1-y2; return dx*dx+dy*dy; }
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function lerp(a,b,t){ return a+(b-a)*t; }
+
+/* =========================================================
+   動力服調色盤（外型進化的核心，配色參考經典薩姆斯美術：
+   紅色頭盔、橄欖綠護目鏡、橘色肩甲、黃色軀幹、綠色臂砲）
+========================================================= */
+const SUITS = {
+  power:   { label:'POWER SUIT',   primary:'#e6201a', armor:'#ff9b1c', highlight:'#eef30c', visor:'#95b90b', cannon:'#149614', trim:'#663300', joint:'#a1a3a2' },
+  varia:   { label:'VARIA SUIT',   primary:'#ff4d1a', armor:'#ff6a1a', highlight:'#ffcf3d', visor:'#ffb347', cannon:'#149614', trim:'#7a1a00', joint:'#c9c9c9' },
+  gravity: { label:'GRAVITY SUIT', primary:'#7b2fbe', armor:'#9b59d0', highlight:'#4fd8ff', visor:'#7ff0ff', cannon:'#1a9e8f', trim:'#241a4a', joint:'#b8b8ff' },
+  hyper:   { label:'HYPER MODE',   primary:'#ffd400', armor:'#ffe066', highlight:'#ffffff', visor:'#fff2b0', cannon:'#ffcc00', trim:'#7a4d00', joint:'#ffffff' },
+};
+
+/* Samus 像素矩陣：由參考圖精確取樣重建（27x29）
+   K輪廓 R主紅 O橘肩腿甲 Y黃綠軀幹 G橄欖綠護目鏡 N綠臂砲 W咖啡色肩帶 E灰色腰帶 */
+const SAMUS_ROWS = [
+  "..........KKKKKKK..........",
+  ".........KWRRRRRRK.........",
+  "........KKWWWRRRRRK........",
+  ".......KKRRWWWRRRRRK.......",
+  ".......KKRRRRWWRRRRRK......",
+  "......KRRRRRRRRWRRWWK......",
+  "......KRRRRGGGGGRRRGK......",
+  "....KKKRRRRGGGGGGGGGKKKKK..",
+  "...KKKKRRRRGGGGGGGGGKKKKK..",
+  "..KKOOKRRRRRGGGGGGGGKOOOOK.",
+  ".KKOOOOKKWWRRRRRGGRRKOOOOOK",
+  ".KKOOOOOOKEWWWRREERREKOOOOK",
+  "..KKOOOOKRKEEEERRREEKOOOOKK",
+  "...KOOOKKRKEEEERRRKKKOOOKK.",
+  "...KKKKOORKKKKKKKKKKRKKKK..",
+  "..KKOOOKKRRRRRRRRRRRKOOOOK.",
+  ".KKOOOKKKKYRRRRRRYKK.KOOOOK",
+  ".KKKKKK.KKYYRRRRYYKK..KOOOK",
+  "KKKKKKK..KYYYRRRYYKK.KKOOOK",
+  "KNNNNNKK..KYYYYYYKK..KOOOYK",
+  "KNNGNNKKKKKYYYYYYKKK.KOOOOK",
+  "KNNGNNKKKKKKYYYYKKKK..KKKK.",
+  ".KGGNKKKKOOKKYYKKOOOK......",
+  ".KKKKKKKOOOKKKKKKOOOKK.....",
+  ".KKKKKKOOOOYYKKYYOOOOKK....",
+  ".KKGNKKOOOOYKK.KYOOOOKKK...",
+  "..KKKOOKKOOK....KOOOKOOKK..",
+  "..KKOOOOOKOK....KOOKOOOOOK.",
+  "..KKKKKKKKKK....KKKKKKKKKK.",
+];
+const SAMUS_WIDTH = 27;
+const SAMUS_UNIT = 2.0;
+const SAMUS_LEG_ROW = 22;
+const SAMUS_LEG_SPLIT = 13;
+
+function drawSamus(ctx, cx, cy, palette, walkPhase, facing, invulFlicker){
+  if(invulFlicker) return;
+  const rows = SAMUS_ROWS;
+  const u = SAMUS_UNIT;
+  const w = SAMUS_WIDTH*u, h = rows.length*u;
+  ctx.save();
+  ctx.translate(cx - w/2, cy - h/2);
+  if(facing < 0){ ctx.translate(w,0); ctx.scale(-1,1); }
+  const legOffset = Math.sin(walkPhase)*1.8;
+  for(let r=0;r<rows.length;r++){
+    const row = rows[r];
+    for(let c=0;c<row.length;c++){
+      const ch = row[c];
+      if(ch==='.') continue;
+      let color;
+      switch(ch){
+        case 'K': color = '#0a0a0a'; break;
+        case 'R': color = palette.primary; break;
+        case 'O': color = palette.armor; break;
+        case 'Y': color = palette.highlight; break;
+        case 'G': color = palette.visor; break;
+        case 'N': color = palette.cannon; break;
+        case 'W': color = palette.trim; break;
+        case 'E': color = palette.joint; break;
+        default: color = '#fff';
+      }
+      let dy = 0;
+      if(r>=SAMUS_LEG_ROW){
+        dy = (c<SAMUS_LEG_SPLIT) ? legOffset : -legOffset;
+      }
+      ctx.fillStyle = color;
+      ctx.fillRect(c*u, r*u+dy, u+0.5, u+0.5);
+    }
+  }
+  ctx.restore();
+}
+
+/* =========================================================
+   背景：札貝斯星表層（Crateria）
+========================================================= */
+const stars = [];
+for(let i=0;i<70;i++){ stars.push({x:rand(0,W), y:rand(0,H*0.6), r:rand(0.5,1.6), tw:rand(0,Math.PI*2)}); }
+const rocks = [];
+for(let i=0;i<18;i++){ rocks.push({x:rand(20,W-20), y:rand(H*0.55,H-20), s:rand(6,18)}); }
+
+function drawBackground(t, playerX, playerY){
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#0b1120');
+  g.addColorStop(0.55,'#141b2e');
+  g.addColorStop(1,'#1c1310');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W,H);
+
+  for(const s of stars){
+    const a = 0.4 + Math.sin(t*1.5+s.tw)*0.3;
+    ctx.fillStyle = `rgba(150,210,255,${clamp(a,0,1)})`;
+    ctx.fillRect(s.x, s.y, s.r*2, s.r*2);
+  }
+
+  const px = (playerX - W/2)*0.02;
+  ctx.fillStyle = '#161a2c';
+  ctx.beginPath();
+  ctx.moveTo(-50-px, H*0.62);
+  for(let x=-50;x<=W+50;x+=80){
+    ctx.lineTo(x-px, H*0.62 - Math.sin(x*0.02)*40 - 30);
+  }
+  ctx.lineTo(W+50-px, H); ctx.lineTo(-50-px, H); ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#20140f';
+  ctx.beginPath();
+  ctx.moveTo(-50-px*1.6, H*0.72);
+  for(let x=-50;x<=W+50;x+=60){
+    ctx.lineTo(x-px*1.6, H*0.72 - Math.cos(x*0.03)*22 - 12);
+  }
+  ctx.lineTo(W+50-px*1.6, H); ctx.lineTo(-50-px*1.6, H); ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(79,216,255,0.08)';
+  ctx.lineWidth = 1;
+  const gridSize = 40;
+  const offX = (playerX*0.15) % gridSize;
+  const offY = (playerY*0.15) % gridSize;
+  for(let x=-offX; x<W; x+=gridSize){
+    ctx.beginPath(); ctx.moveTo(x, H*0.62); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for(let y=H*0.62-offY; y<H; y+=gridSize){
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  }
+
+  ctx.fillStyle = '#0d0805';
+  for(const r of rocks){
+    ctx.beginPath();
+    ctx.ellipse(r.x, r.y, r.s, r.s*0.55, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  const vg = ctx.createRadialGradient(W/2,H/2,H*0.35,W/2,H/2,H*0.85);
+  vg.addColorStop(0,'rgba(0,0,0,0)');
+  vg.addColorStop(1,'rgba(0,0,0,0.55)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0,0,W,H);
+}
+
+/* =========================================================
+   粒子系統
+========================================================= */
+let particles = [];
+function spawnBurst(x,y,color,count,speed,life){
+  for(let i=0;i<count;i++){
+    const a = rand(0,Math.PI*2);
+    const sp = rand(speed*0.3,speed);
+    particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life,maxLife:life,color,size:rand(2,4)});
+  }
+}
+function updateParticles(dt){
+  for(let i=particles.length-1;i>=0;i--){
+    const p = particles[i];
+    p.x += p.vx*dt; p.y += p.vy*dt;
+    p.vx *= 0.94; p.vy *= 0.94;
+    p.life -= dt;
+    if(p.life<=0) particles.splice(i,1);
+  }
+}
+function drawParticles(){
+  for(const p of particles){
+    ctx.globalAlpha = clamp(p.life/p.maxLife,0,1);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x-p.size/2, p.y-p.size/2, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* =========================================================
+   玩家
+========================================================= */
+const player = {
+  x:W/2, y:H/2, r:10,
+  speed:190,
+  hp:100, maxHp:100,
+  level:1, xp:0, xpToNext:10,
+  facing:1, walkPhase:0, moving:false,
+  invulTimer:0,
+  dmgReduction:0,
+  magnetRadius:90,
+  upgrades:{ powerBeam:1, missile:0, energyTank:0, speedBooster:0, variaSuit:0, gravitySuit:0, chargeCore:0, diffusionCore:0, hyperBeam:0 },
+  evolved:{ powerBeam:false, missile:false },
+};
+
+const keys = {};
+window.addEventListener('keydown', e=>{ keys[e.key.toLowerCase()]=true; });
+window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; });
+
+function currentPalette(){
+  if(player.upgrades.hyperBeam) return SUITS.hyper;
+  if(player.upgrades.gravitySuit) return SUITS.gravity;
+  if(player.upgrades.variaSuit) return SUITS.varia;
+  return SUITS.power;
+}
+
+/* =========================================================
+   武器 / 子彈
+========================================================= */
+let projectiles = [];
+
+function nearestEnemy(x,y, exclude){
+  let best=null, bd=Infinity;
+  for(const en of enemies){
+    if(en===exclude) continue;
+    const d = dist2(x,y,en.x,en.y);
+    if(d<bd){ bd=d; best=en; }
+  }
+  return best;
+}
+function nearestEnemies(x,y,n){
+  return enemies.slice().sort((a,b)=>dist2(x,y,a.x,a.y)-dist2(x,y,b.x,b.y)).slice(0,n);
+}
+
+const weapons = {
+  powerBeam: { cooldown:0.42, timer:0 },
+  missile:   { cooldown:1.1, timer:0 },
+};
+
+function fireWeapons(dt){
+  const lvB = player.upgrades.powerBeam;
+  if(lvB>0){
+    weapons.powerBeam.timer -= dt;
+    const evolved = player.evolved.powerBeam;
+    const cd = evolved ? 0.5 : Math.max(0.14, 0.42 - lvB*0.035);
+    if(weapons.powerBeam.timer<=0 && enemies.length>0){
+      weapons.powerBeam.timer = cd;
+      const target = nearestEnemy(player.x, player.y);
+      if(target){
+        const baseAng = Math.atan2(target.y-player.y, target.x-player.x);
+        if(evolved){
+          const dmg = 42 + lvB*6;
+          projectiles.push({
+            x:player.x, y:player.y, vx:Math.cos(baseAng)*640, vy:Math.sin(baseAng)*640,
+            dmg, r:6, type:'beam', pierce:4, life:1.6, evolved:true
+          });
+        } else {
+          const count = 1 + Math.floor(lvB/2);
+          const dmg = 7 + lvB*4;
+          for(let i=0;i<count;i++){
+            const spread = (i-(count-1)/2)*0.18;
+            const ang = baseAng+spread;
+            projectiles.push({
+              x:player.x, y:player.y, vx:Math.cos(ang)*520, vy:Math.sin(ang)*520,
+              dmg, r:4, type:'beam', pierce:1, life:1.4
+            });
+          }
+        }
+      }
+    }
+  }
+  const lvM = player.upgrades.missile;
+  if(lvM>0){
+    weapons.missile.timer -= dt;
+    const evolved = player.evolved.missile;
+    const cd = Math.max(0.42, 1.1 - lvM*0.14);
+    if(weapons.missile.timer<=0 && enemies.length>0){
+      weapons.missile.timer = cd;
+      const count = Math.min(lvM,4);
+      const targets = nearestEnemies(player.x, player.y, count);
+      for(let i=0;i<count;i++){
+        const target = targets[i % targets.length];
+        if(!target) continue;
+        const spread = targets.length<count ? (i-(count-1)/2)*0.3 : 0;
+        const ang = Math.atan2(target.y-player.y, target.x-player.x) + spread;
+        projectiles.push({
+          x:player.x, y:player.y, vx:Math.cos(ang)*300, vy:Math.sin(ang)*300,
+          dmg:(evolved?30:20)+lvM*(evolved?16:12), r: evolved?8:6, type:'missile',
+          pierce:1, life:2.4, homing:true, target, evolved
+        });
+      }
+    }
+  }
+}
+
+function damageEnemy(en, dmg){
+  en.hp -= dmg;
+  en.hitFlash = 0.15;
+  if(en.hp<=0){
+    const idx = enemies.indexOf(en);
+    if(idx>=0) killEnemy(idx);
+  }
+}
+
+function updateProjectiles(dt){
+  for(let i=projectiles.length-1;i>=0;i--){
+    const p = projectiles[i];
+    if(p.homing){
+      if(!p.target || !enemies.includes(p.target)){
+        p.target = nearestEnemy(p.x,p.y);
+      }
+      if(p.target){
+        const ang = Math.atan2(p.target.y-p.y, p.target.x-p.x);
+        const speed = Math.hypot(p.vx,p.vy) || 300;
+        const turn = clamp(dt*6, 0, 1);
+        p.vx = lerp(p.vx, Math.cos(ang)*speed, turn);
+        p.vy = lerp(p.vy, Math.sin(ang)*speed, turn);
+      }
+    }
+    p.x += p.vx*dt; p.y += p.vy*dt;
+    p.life -= dt;
+    if(p.life<=0 || p.x<-20||p.x>W+20||p.y<-20||p.y>H+20){ projectiles.splice(i,1); continue; }
+    for(let j=enemies.length-1;j>=0;j--){
+      const en = enemies[j];
+      if(dist2(p.x,p.y,en.x,en.y) < (p.r+en.r)*(p.r+en.r)){
+        spawnBurst(p.x,p.y, p.type==='missile'?'#ffb03d':'#7ff0ff', 5, 90, 0.3);
+        damageEnemy(en, p.dmg);
+        if(p.type==='missile'){
+          const radius = p.evolved ? 85 : 34;
+          spawnBurst(p.x,p.y, p.evolved?'#ff5b3d':'#ffb03d', p.evolved?24:10, p.evolved?200:120, p.evolved?0.6:0.35);
+          for(const other of enemies.slice()){
+            if(other===en) continue;
+            if(dist2(p.x,p.y,other.x,other.y) < radius*radius){
+              damageEnemy(other, p.dmg*0.5);
+            }
+          }
+          p.pierce = 0;
+        } else {
+          p.pierce -= 1;
+        }
+        if(p.pierce<=0){ projectiles.splice(i,1); }
+        break;
+      }
+    }
+  }
+}
+
+function drawProjectiles(){
+  for(const p of projectiles){
+    if(p.type==='beam'){
+      ctx.save();
+      ctx.shadowColor = p.evolved ? '#ffffff' : '#7ff0ff';
+      ctx.shadowBlur = p.evolved ? 16 : 8;
+      ctx.fillStyle = p.evolved ? '#eaffff' : '#dffcff';
+      const ang = Math.atan2(p.vy,p.vx);
+      ctx.translate(p.x,p.y); ctx.rotate(ang);
+      if(p.evolved){ ctx.fillRect(-14,-4,28,8); }
+      else{ ctx.fillRect(-8,-2,16,4); }
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.shadowColor = p.evolved ? '#ff5b3d' : '#ffb03d';
+      ctx.shadowBlur = p.evolved ? 14 : 10;
+      ctx.fillStyle = p.evolved ? '#fff0dc' : '#ffdca0';
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+  }
+}
+
+/* =========================================================
+   敵人
+========================================================= */
+let enemies = [];
+let gems = [];
+let spawnTimer = 0;
+let elapsed = 0;
+
+function spawnEnemy(){
+  const edge = randInt(0,3);
+  let x,y;
+  if(edge===0){ x=rand(0,W); y=-20; }
+  else if(edge===1){ x=W+20; y=rand(0,H); }
+  else if(edge===2){ x=rand(0,W); y=H+20; }
+  else { x=-20; y=rand(0,H); }
+
+  const minutes = elapsed/60;
+  const hpScale = 1 + minutes*0.22;
+  const isFlyer = Math.random() < 0.4;
+
+  if(isFlyer){
+    enemies.push({ x,y, type:'skree', r:11, hp:10*hpScale, maxHp:10*hpScale, speed:rand(95,130),
+      dmg:6, phase:rand(0,Math.PI*2), hitFlash:0 });
+  } else {
+    enemies.push({ x,y, type:'zeela', r:13, hp:16*hpScale, maxHp:16*hpScale, speed:rand(55,85),
+      dmg:9, phase:rand(0,Math.PI*2), hitFlash:0 });
+  }
+}
+
+function updateEnemies(dt){
+  const baseInterval = clamp(1.1 - elapsed*0.005, 0.28, 1.1);
+  spawnTimer -= dt;
+  if(spawnTimer<=0){ spawnTimer = baseInterval; spawnEnemy(); }
+
+  for(const en of enemies){
+    en.phase += dt*4;
+    if(en.hitFlash>0) en.hitFlash -= dt;
+    let tx = player.x, ty = player.y;
+    if(en.type==='skree'){ tx += Math.sin(en.phase)*30; ty += Math.cos(en.phase*0.7)*20; }
+    const ang = Math.atan2(ty-en.y, tx-en.x);
+    en.x += Math.cos(ang)*en.speed*dt;
+    en.y += Math.sin(ang)*en.speed*dt;
+
+    if(player.invulTimer<=0 && dist2(en.x,en.y,player.x,player.y) < (en.r+player.r)*(en.r+player.r)){
+      const dmg = en.dmg*(1-player.dmgReduction);
+      player.hp -= dmg;
+      player.invulTimer = 0.6;
+      spawnBurst(player.x,player.y,'#ff5b5b',10,120,0.35);
+    }
+  }
+  if(player.invulTimer>0) player.invulTimer -= dt;
+}
+
+function killEnemy(index){
+  const en = enemies[index];
+  spawnBurst(en.x,en.y, en.type==='skree' ? '#c58bff' : '#ffd76a', 10, 140, 0.4);
+  const gemVal = en.type==='skree' ? 2 : 1;
+  gems.push({x:en.x,y:en.y,vx:0,vy:0,value:gemVal,r:5,phase:rand(0,7)});
+  enemies.splice(index,1);
+}
+
+function drawEnemies(){
+  for(const en of enemies){
+    const flash = en.hitFlash>0;
+    ctx.save();
+    ctx.translate(en.x, en.y);
+    if(en.type==='zeela'){
+      const bob = Math.sin(en.phase)*2;
+      ctx.fillStyle = flash ? '#ffffff' : '#d8a017';
+      ctx.beginPath();
+      ctx.ellipse(0, bob, en.r, en.r*0.75, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = flash ? '#ffffff' : '#7a5406';
+      for(let i=-1;i<=1;i+=2){
+        ctx.fillRect(i*8-2, bob+en.r*0.5, 4, 6+Math.sin(en.phase*2)*2);
+      }
+      ctx.fillStyle = '#ff2e2e';
+      ctx.fillRect(-4, bob-4, 3,3);
+      ctx.fillRect(2, bob-4, 3,3);
+    } else {
+      ctx.rotate(en.phase*0.6);
+      ctx.fillStyle = flash ? '#ffffff' : '#a35bd0';
+      const spikes = 6;
+      ctx.beginPath();
+      for(let i=0;i<spikes*2;i++){
+        const rad = i%2===0 ? en.r : en.r*0.5;
+        const a = (Math.PI/spikes)*i;
+        const px = Math.cos(a)*rad, py = Math.sin(a)*rad;
+        if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#ffe27a';
+      ctx.fillRect(-2,-2,4,4);
+    }
+    ctx.restore();
+
+    if(en.hp < en.maxHp){
+      const bw = en.r*2;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(en.x-bw/2, en.y-en.r-10, bw, 3);
+      ctx.fillStyle = '#ff5b3d';
+      ctx.fillRect(en.x-bw/2, en.y-en.r-10, bw*clamp(en.hp/en.maxHp,0,1), 3);
+    }
+  }
+}
+
+/* =========================================================
+   經驗結晶
+========================================================= */
+function updateGems(dt){
+  for(let i=gems.length-1;i>=0;i--){
+    const g = gems[i];
+    g.phase += dt*5;
+    const d2 = dist2(g.x,g.y,player.x,player.y);
+    if(d2 < player.magnetRadius*player.magnetRadius){
+      const ang = Math.atan2(player.y-g.y, player.x-g.x);
+      const pull = 420;
+      g.vx = Math.cos(ang)*pull; g.vy = Math.sin(ang)*pull;
+    } else {
+      g.vx *= 0.9; g.vy *= 0.9;
+    }
+    g.x += g.vx*dt; g.y += g.vy*dt;
+    if(d2 < (player.r+g.r+4)*(player.r+g.r+4)){
+      gainXp(g.value);
+      gems.splice(i,1);
+    }
+  }
+}
+function drawGems(){
+  for(const g of gems){
+    const bob = Math.sin(g.phase)*2;
+    ctx.save();
+    ctx.translate(g.x, g.y+bob);
+    ctx.rotate(Math.PI/4);
+    ctx.shadowColor = '#4fd8ff'; ctx.shadowBlur = 8;
+    ctx.fillStyle = g.value>1 ? '#ffe27a' : '#4fd8ff';
+    ctx.fillRect(-g.r,-g.r,g.r*2,g.r*2);
+    ctx.restore();
+  }
+}
+
+/* =========================================================
+   升級系統
+========================================================= */
+function iconDraw(id){
+  return function(canvasEl){
+    const c = canvasEl.getContext('2d');
+    c.clearRect(0,0,64,64);
+    c.imageSmoothingEnabled = false;
+    switch(id){
+      case 'powerBeam':
+        c.save(); c.translate(32,32); c.rotate(-0.5);
+        c.shadowColor='#7ff0ff'; c.shadowBlur=10;
+        c.fillStyle='#dffcff'; c.fillRect(-22,-4,44,8);
+        c.restore();
+        break;
+      case 'missile':
+        c.save(); c.translate(32,32); c.rotate(-0.6);
+        c.shadowColor='#ffb03d'; c.shadowBlur=10;
+        c.fillStyle='#ffdca0';
+        c.beginPath(); c.moveTo(-18,-7); c.lineTo(14,-7); c.lineTo(22,0); c.lineTo(14,7); c.lineTo(-18,7); c.closePath(); c.fill();
+        c.restore();
+        break;
+      case 'energyTank':
+        c.fillStyle='#0a0e18'; c.fillRect(16,10,32,44);
+        c.strokeStyle='#4fd8ff'; c.lineWidth=2; c.strokeRect(16,10,32,44);
+        c.fillStyle='#ff5b3d'; c.fillRect(20,30,24,20);
+        break;
+      case 'speedBooster':
+        c.strokeStyle='#4fd8ff'; c.lineWidth=4;
+        for(let i=0;i<3;i++){
+          c.beginPath(); c.moveTo(14+i*8,50-i*6); c.lineTo(44+i*6,14+i*4); c.stroke();
+        }
+        break;
+      case 'variaSuit':
+        c.fillStyle=SUITS.varia.primary; c.beginPath(); c.arc(32,24,15,0,Math.PI*2); c.fill();
+        c.fillStyle=SUITS.varia.visor; c.fillRect(23,19,18,7);
+        c.fillStyle=SUITS.varia.armor; c.fillRect(17,40,30,16);
+        break;
+      case 'gravitySuit':
+        c.fillStyle=SUITS.gravity.primary; c.beginPath(); c.arc(32,24,15,0,Math.PI*2); c.fill();
+        c.fillStyle=SUITS.gravity.visor; c.fillRect(23,19,18,7);
+        c.fillStyle=SUITS.gravity.armor; c.fillRect(17,40,30,16);
+        break;
+      case 'hyperBeam':
+        c.save(); c.translate(32,32);
+        c.shadowColor='#ffe066'; c.shadowBlur=18;
+        c.fillStyle='#fff2b0';
+        for(let i=0;i<8;i++){
+          const a=(Math.PI/4)*i;
+          c.fillRect(Math.cos(a)*18-3, Math.sin(a)*18-3, 8,8);
+        }
+        c.restore();
+        break;
+      case 'chargeCore':
+        c.save(); c.translate(32,32);
+        c.shadowColor='#7ff0ff'; c.shadowBlur=14;
+        c.strokeStyle='#dffcff'; c.lineWidth=4;
+        c.beginPath(); c.arc(0,0,18,0,Math.PI*1.5); c.stroke();
+        c.fillStyle='#dffcff'; c.beginPath(); c.arc(0,0,6,0,Math.PI*2); c.fill();
+        c.restore();
+        break;
+      case 'diffusionCore':
+        c.save(); c.translate(32,32);
+        c.shadowColor='#ffb03d'; c.shadowBlur=14;
+        c.fillStyle='#ffdca0'; c.beginPath(); c.arc(0,0,10,0,Math.PI*2); c.fill();
+        c.strokeStyle='#ff8a3d'; c.lineWidth=3;
+        for(let i=0;i<6;i++){
+          const a=(Math.PI/3)*i;
+          c.beginPath(); c.moveTo(Math.cos(a)*12,Math.sin(a)*12); c.lineTo(Math.cos(a)*22,Math.sin(a)*22); c.stroke();
+        }
+        c.restore();
+        break;
+    }
+  };
+}
+
+const UPGRADE_DEFS = {
+  powerBeam:{ name:'力量光束強化', max:5, desc:'提升傷害、射速，並增加彈幕數量。', isNew:false,
+    apply:()=>{ player.upgrades.powerBeam++; } },
+  missile:{ name:'飛彈發射器', max:4, desc:'鎖定最近敵人的追蹤飛彈，等級提升會增加飛彈數量。', isNew:true,
+    apply:()=>{ player.upgrades.missile++; } },
+  energyTank:{ name:'能量儲存槽', max:4, desc:'最大能量 +30，並立即回復。', isNew:false,
+    apply:()=>{ player.maxHp+=30; player.hp = Math.min(player.maxHp, player.hp+30); player.upgrades.energyTank++; } },
+  speedBooster:{ name:'高速閃避裝置', max:3, desc:'移動速度提升，拾取範圍擴大。', isNew:false,
+    apply:()=>{ player.speed+=26; player.magnetRadius+=18; player.upgrades.speedBooster++; } },
+  variaSuit:{ name:'瓦利亞防護服', max:1, desc:'★動力服進化：抗傷 +20%，外型變為耐熱橘紅色。', isNew:true,
+    apply:()=>{ player.upgrades.variaSuit=1; player.dmgReduction+=0.2; triggerSuitChange(); } },
+  gravitySuit:{ name:'重力防護服', max:1, desc:'★動力服進化：抗傷再 +15%、拾取範圍擴大，外型變為深紫色。', isNew:true,
+    apply:()=>{ player.upgrades.gravitySuit=1; player.dmgReduction+=0.15; player.magnetRadius+=20; triggerSuitChange(); } },
+  hyperBeam:{ name:'究極能量覺醒', max:1, desc:'★終極進化：融合兩套裝甲之力，抗傷再 +10%，化為金色 HYPER MODE。', isNew:true,
+    apply:()=>{ player.upgrades.hyperBeam=1; player.dmgReduction+=0.1; triggerSuitChange(); } },
+  chargeCore:{ name:'充能核心', max:1, desc:'★武器進化：力量光束滿級後，進化為高傷貫穿的「充能光束」。', isNew:true,
+    apply:()=>{ player.upgrades.chargeCore=1; checkEvolutions(); } },
+  diffusionCore:{ name:'擴散核心', max:1, desc:'★武器進化：飛彈滿級後，進化為範圍爆炸的「超級飛彈」。', isNew:true,
+    apply:()=>{ player.upgrades.diffusionCore=1; checkEvolutions(); } },
+};
+
+function checkEvolutions(){
+  if(!player.evolved.powerBeam && player.upgrades.powerBeam>=5 && player.upgrades.chargeCore>=1){
+    player.evolved.powerBeam = true;
+    spawnBurst(player.x,player.y,'#dffcff',34,220,0.8);
+  }
+  if(!player.evolved.missile && player.upgrades.missile>=4 && player.upgrades.diffusionCore>=1){
+    player.evolved.missile = true;
+    spawnBurst(player.x,player.y,'#ffb03d',34,220,0.8);
+  }
+}
+
+function triggerSuitChange(){
+  spawnBurst(player.x, player.y, currentPalette().highlight, 40, 220, 0.9);
+  flashEl.style.transition='none';
+  flashEl.style.opacity='0.9';
+  requestAnimationFrame(()=>{
+    flashEl.style.transition='opacity 0.6s ease';
+    flashEl.style.opacity='0';
+  });
+}
+
+function gainXp(v){
+  player.xp += v;
+  while(player.xp >= player.xpToNext){
+    player.xp -= player.xpToNext;
+    player.level++;
+    player.xpToNext = 8 + player.level*5;
+    queueLevelUp();
+  }
+}
+
+let levelUpQueue = 0;
+function queueLevelUp(){ levelUpQueue++; }
+
+function availableUpgradeIds(){
+  const ids = [];
+  for(const id in UPGRADE_DEFS){
+    if(id==='gravitySuit' && !player.upgrades.variaSuit) continue;
+    if(id==='hyperBeam' && !(player.upgrades.variaSuit && player.upgrades.gravitySuit)) continue;
+    if(id==='chargeCore' && (player.upgrades.powerBeam<5 || player.evolved.powerBeam)) continue;
+    if(id==='diffusionCore' && (player.upgrades.missile<4 || player.evolved.missile)) continue;
+    const lvl = player.upgrades[id]||0;
+    if(lvl < UPGRADE_DEFS[id].max) ids.push(id);
+  }
+  return ids;
+}
+
+function openLevelUp(){
+  state = 'levelup';
+  levelupOverlay.classList.remove('hidden');
+  const pool = availableUpgradeIds();
+  for(let i=pool.length-1;i>0;i--){ const j=randInt(0,i); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+  const picks = pool.slice(0,3);
+  cardsEl.innerHTML='';
+  for(const id of picks){
+    const def = UPGRADE_DEFS[id];
+    const lvl = player.upgrades[id]||0;
+    const isEvo = (id==='chargeCore' || id==='diffusionCore' || id==='hyperBeam');
+    const card = document.createElement('div');
+    card.className = 'card' + (isEvo ? ' evo' : (def.isNew && lvl===0 ? ' new' : ''));
+    const isFirstTime = lvl===0 && def.max===1;
+    card.innerHTML = `
+      <canvas class="card-icon" width="64" height="64"></canvas>
+      <div class="card-name">${def.name}</div>
+      <div class="card-lv">${isFirstTime ? '【首次獲得】' : 'Lv.'+lvl+' → '+(lvl+1)}</div>
+      <div class="card-desc">${def.desc}</div>
+    `;
+    card.addEventListener('click', ()=>{
+      def.apply();
+      closeLevelUp();
+    });
+    cardsEl.appendChild(card);
+    iconDraw(id)(card.querySelector('canvas'));
+  }
+  if(picks.length===0){
+    cardsEl.innerHTML = '<div class="card-desc" style="font-size:14px;">所有能力已達巔峰！</div>';
+    setTimeout(closeLevelUp, 900);
+  }
+}
+function closeLevelUp(){
+  levelupOverlay.classList.add('hidden');
+  levelUpQueue = Math.max(0, levelUpQueue-1);
+  if(levelUpQueue>0){ openLevelUp(); }
+  else { state='playing'; }
+}
+
+/* =========================================================
+   遊戲狀態機
+========================================================= */
+let state = 'start'; // start | playing | levelup | gameover
+let lastTime = 0;
+
+function resetGame(){
+  player.x=W/2; player.y=H/2; player.hp=100; player.maxHp=100;
+  player.level=1; player.xp=0; player.xpToNext=10;
+  player.speed=190; player.dmgReduction=0; player.magnetRadius=90;
+  player.upgrades={ powerBeam:1, missile:0, energyTank:0, speedBooster:0, variaSuit:0, gravitySuit:0, chargeCore:0, diffusionCore:0, hyperBeam:0 };
+  player.evolved={ powerBeam:false, missile:false };
+  player.invulTimer=0;
+  enemies=[]; gems=[]; projectiles=[]; particles=[];
+  spawnTimer=0.6; elapsed=0; levelUpQueue=0;
+  weapons.powerBeam.timer=0; weapons.missile.timer=0;
+}
+
+function startGame(){
+  resetGame();
+  state='playing';
+  startOverlay.classList.add('hidden');
+  gameoverOverlay.classList.add('hidden');
+}
+
+function endGame(){
+  state='gameover';
+  const m = Math.floor(elapsed/60), s = Math.floor(elapsed%60);
+  $('go-time').textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  $('go-level').textContent = player.level;
+  $('go-suit').textContent = currentPalette().label;
+  gameoverOverlay.classList.remove('hidden');
+}
+
+$('btn-start').addEventListener('click', startGame);
+$('btn-restart').addEventListener('click', startGame);
+window.addEventListener('keydown', e=>{
+  if(state==='start' && (e.key==='Enter'||e.key===' ')) startGame();
+});
+
+/* =========================================================
+   更新 / 繪製
+========================================================= */
+function updatePlayer(dt){
+  let mx=0, my=0;
+  if(keys['w']||keys['arrowup']) my-=1;
+  if(keys['s']||keys['arrowdown']) my+=1;
+  if(keys['a']||keys['arrowleft']) mx-=1;
+  if(keys['d']||keys['arrowright']) mx+=1;
+  const mag = Math.hypot(mx,my);
+  player.moving = mag>0;
+  if(mag>0){
+    mx/=mag; my/=mag;
+    player.x = clamp(player.x + mx*player.speed*dt, 24, W-24);
+    player.y = clamp(player.y + my*player.speed*dt, 24, H-24);
+    if(mx!==0) player.facing = mx>0?1:-1;
+    player.walkPhase += dt*10;
+  }
+  if(player.hp>player.maxHp) player.hp = player.maxHp;
+}
+
+function update(dt){
+  elapsed += dt;
+  updatePlayer(dt);
+  fireWeapons(dt);
+  updateProjectiles(dt);
+  updateEnemies(dt);
+  updateGems(dt);
+  updateParticles(dt);
+
+  if(player.hp<=0){ endGame(); return; }
+  if(levelUpQueue>0 && state==='playing'){ openLevelUp(); }
+}
+
+function draw(){
+  drawBackground(elapsed, player.x, player.y);
+  drawGems();
+  drawEnemies();
+  drawProjectiles();
+
+  const invulFlicker = player.invulTimer>0 && Math.floor(elapsed*20)%2===0;
+  drawSamus(ctx, player.x, player.y, currentPalette(), player.walkPhase, player.facing, invulFlicker);
+
+  drawParticles();
+
+  hpNum.textContent = Math.max(0,Math.ceil(player.hp))+'/'+player.maxHp;
+  hpBar.style.width = clamp(player.hp/player.maxHp,0,1)*100+'%';
+  if(player.hp/player.maxHp < 0.3){ hpBar.style.background = 'linear-gradient(90deg,#ff2020,#ff6a3d)'; }
+  else{ hpBar.style.background = 'linear-gradient(90deg,#ff5b3d,#ffb03d)'; }
+
+  levelTxt.textContent = 'LV. '+player.level;
+  xpBar.style.width = clamp(player.xp/player.xpToNext,0,1)*100+'%';
+
+  const m = Math.floor(elapsed/60), s = Math.floor(elapsed%60);
+  timerTxt.textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+
+  suitNameEl.textContent = currentPalette().label;
+}
+
+function loop(ts){
+  const dt = Math.min((ts-lastTime)/1000, 0.05) || 0;
+  lastTime = ts;
+  if(state==='playing'){ update(dt); }
+  if(state==='playing' || state==='levelup'){ draw(); }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
