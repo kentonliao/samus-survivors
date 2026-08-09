@@ -68,6 +68,15 @@
   .stat-row{ font-size:16px; margin:6px 0; color:var(--text-main); }
   .stat-row span{ color:var(--gold); }
 
+  #victory-overlay{ background:radial-gradient(ellipse at center, rgba(20,10,5,0.95), rgba(3,2,1,0.98)); }
+  #victory-title{ font-family:'Press Start 2P'; font-size:28px; color:#ffd76a; text-shadow:0 0 22px rgba(255,215,106,0.7); letter-spacing:2px; }
+  #victory-sub{ font-family:'Press Start 2P'; font-size:12px; color:#e6201a; margin-top:12px; letter-spacing:2px; }
+
+  #boss-announce{ position:absolute;inset:0; display:flex;flex-direction:column;align-items:center;justify-content:center; background:rgba(2,1,0,0.9); z-index:26; text-align:center; }
+  .boss-warn{ font-family:'Press Start 2P'; font-size:14px; color:#ff3b3b; letter-spacing:2px; text-shadow:0 0 14px rgba(255,59,59,0.8); }
+  .boss-title{ font-family:'Press Start 2P'; font-size:26px; color:#1e9628; margin-top:16px; text-shadow:0 0 20px rgba(30,150,40,0.7); }
+  .boss-flavor{ margin-top:16px; color:var(--text-dim); font-size:13px; max-width:480px; }
+
   #levelup-overlay{ background:rgba(3,5,10,0.88); }
   #levelup-title{ font-family:'Press Start 2P'; font-size:18px; color:var(--line-cyan); margin-bottom:26px; text-shadow:0 0 12px rgba(79,216,255,0.6);}
   #cards{ display:flex; gap:18px; pointer-events:all; flex-wrap:wrap; justify-content:center; max-width:920px;}
@@ -141,6 +150,23 @@
       <div class="evo-emoji" id="evo-emoji">⚡</div>
       <div class="evo-name" id="evo-name">NOVA BEAM</div>
       <div class="evo-desc" id="evo-desc"></div>
+    </div>
+
+    <div id="boss-announce" class="overlay hidden">
+      <div class="boss-warn">★ 威脅偵測 ★</div>
+      <div class="boss-title">QUEEN METROID</div>
+      <div class="boss-flavor">動力服已完全覺醒，星球深處的最終威脅甦醒了。<br>擊敗它，證明薩姆斯的極限。</div>
+    </div>
+
+    <div id="victory-overlay" class="overlay hidden">
+      <div id="victory-title">MISSION COMPLETE</div>
+      <div id="victory-sub">QUEEN METROID 已擊破</div>
+      <div style="margin-top:22px;">
+        <div class="stat-row">存活時間　<span id="vic-time">00:00</span></div>
+        <div class="stat-row">到達等級　<span id="vic-level">1</span></div>
+        <div class="stat-row">最終型態　<span id="vic-suit">HYPER MODE</span></div>
+      </div>
+      <div class="start-btn" id="btn-victory-restart" style="margin-top:30px;">再玩一次</div>
     </div>
 
     <div id="gameover-overlay" class="overlay hidden">
@@ -258,6 +284,71 @@ function drawSamus(ctx, cx, cy, palette, walkPhase, facing, invulFlicker){
       if(r>=SAMUS_LEG_ROW){ dy = (c<SAMUS_LEG_SPLIT) ? legOffset : -legOffset; }
       ctx.fillStyle = color;
       ctx.fillRect(c*u, r*u+dy, u+0.5, u+0.5);
+    }
+  }
+  ctx.restore();
+}
+
+/* =========================================================
+   終極頭目（依使用者上傳的參考圖精確取樣重建）
+========================================================= */
+const FINAL_BOSS_ROWS = [
+  "...........KKKKKKKKKK..........",
+  ".........KKGGGGGGGGGKKK........",
+  "........KGGKKKKKKKKKKGGK.......",
+  ".......KGGGKKKKKKKKKKGGK.......",
+  "......KGKKKKKKKKKKKKKKKGKK.....",
+  ".....KGKKKKKKKKKKKKRRKKKGKK....",
+  "....KGKKKKKKKKKRRRRKKKHKKGGK...",
+  "...KGKRKKKKKKKKKKKKKKKHHKGGK...",
+  "..KKGKKKKKKKKRKKKKKKKKHHHKKKK..",
+  "..KKGKKRKKKKKKKKKKKKKKKHHKKGK..",
+  ".KGGKKKRKKKKKKKRRKKKKKKKHKKGK..",
+  ".KGGKKKRKKKKKRRHHRKKKKKKKKKKGK.",
+  ".KGGKKKKKRKKKHHHHHKKKKKKKKKKGK.",
+  "KGKKRRKKRRKKKRHHHRKKKKKKKKKKGK.",
+  "KGKKRRKKKKKKKKRHHRKKKKKKKKKKGKK",
+  "KGKKKKRKKKRHRKKRRKRHHRKRRKKKKGK",
+  "KGKKKKKKRRHHHRRKKRHHHHRKKRRRKGK",
+  "KGKKKKKKRRHHHHHKKHHHHHRKKKKKKGK",
+  "KGGGGGKKKKRHHRKKKRHHHRKKKKGGGGK",
+  "KGGKKKGGKKKRRRKKKKRRRKKGGKKKKGK",
+  "KGKKKKGGGKKRRKKKKKRRKKKGGKKKKGK",
+  "KGKKRRKGGGGKKKKKKKKKKGGGKRRRKGK",
+  ".KGGRRRKKKGGGKKKKKGGGGKKRRRRGK.",
+  "..KKRRKKKKKGGGGGGGKKKKKRRR.K..",
+  "..KKRKKKK.KKGGGGGKKK.KKKRR.K..",
+  "..KKRKKKK.KKKGGGKKK..KKKKR.K..",
+  "......KKKK..KKKGGKK...KKK...K..",
+  ".......KKK..K..KK.K...KK.......",
+];
+const FINAL_BOSS_UNIT = 3.3;
+function drawFinalBoss(ctx, cx, cy, phase, hitFlash){
+  const rows = FINAL_BOSS_ROWS;
+  const u = FINAL_BOSS_UNIT;
+  let maxW = 0; for(const r of rows) maxW = Math.max(maxW, r.length);
+  const w = maxW*u, h = rows.length*u;
+  const pulse = 0.75 + Math.sin(phase*3)*0.25;
+  ctx.save();
+  ctx.translate(cx - w/2, cy - h/2);
+  for(let r=0;r<rows.length;r++){
+    const row = rows[r];
+    for(let c=0;c<row.length;c++){
+      const ch = row[c];
+      if(ch==='.') continue;
+      let color;
+      if(hitFlash>0){ color='#ffffff'; }
+      else{
+        switch(ch){
+          case 'K': color='#0a0a0a'; break;
+          case 'G': color='#1e9628'; break;
+          case 'R': color=`rgba(230,25,20,${pulse})`; break;
+          case 'H': color='#f2f2f2'; break;
+          default: color='#fff';
+        }
+      }
+      ctx.fillStyle = color;
+      ctx.fillRect(c*u, r*u, u+0.6, u+0.6);
     }
   }
   ctx.restore();
@@ -390,7 +481,7 @@ const WEAPON_DEFS = {
   powerBomb:{ name:'強力炸彈', emoji:'☄️', category:'delayed_nova', color:'#ff5b3d',
     baseDmg:42, dmgPerLv:17, cooldown:4.0, cdPerLv:-0.2, minCooldown:1.6, radius:110, radiusPerLv:6, delay:0.6,
     evoPartner:'reserveTank', evo:{ id:'zeroCountdown', name:'Zero Countdown 歸零倒數', emoji:'💥', color:'#ffffff',
-      desc:'清屏核彈，引爆瞬間造成大量傷害並回復能量。', dmgMult:2.0, radiusAdd:80, healOnDetonate:0.15 } },
+      desc:'清屏核彈，引爆瞬間造成大量傷害並回復能量。', dmgMult:2.0, radiusAdd:80, healOnDetonate:0.15, countAdd:2 } },
   screwAttack:{ name:'螺旋攻擊', emoji:'🌀', category:'orbit_aura', color:'#c58bff',
     baseDmg:11, dmgPerLv:4.3, radius:55, radiusPerLv:3,
     evoPartner:'boosterCoil', evo:{ id:'shinesparkFury', name:'Shinespark Fury 閃光衝刺・狂', emoji:'✨', color:'#ffe9ff',
@@ -490,6 +581,7 @@ function weaponStats(w){
       s.cooldown = Math.max(def.minCooldown||1.5, def.cooldown + def.cdPerLv*(lv-1));
       s.radius = def.radius + def.radiusPerLv*(lv-1);
       s.delay = def.delay;
+      s.count = 1 + Math.floor((lv-1)/3);
       break;
     case 'orbit_aura':
       s.dps = def.baseDmg + def.dmgPerLv*(lv-1);
@@ -691,7 +783,17 @@ function drawBombs(){
 }
 
 function scheduleNova(w, s){
-  novas.push({ x:player.x, y:player.y, delay:s.delay, totalDelay:s.delay, dmg:s.damage, radius:s.radius, weaponId:w.id, evolved:w.evolved });
+  const count = Math.max(1, Math.round(s.count||1));
+  for(let i=0;i<count;i++){
+    let x,y;
+    if(i===0){ x=player.x; y=player.y; }
+    else {
+      const ang = rand(0,Math.PI*2), d = rand(90,240);
+      x = clamp(player.x+Math.cos(ang)*d, 40, W-40);
+      y = clamp(player.y+Math.sin(ang)*d, 40, H-40);
+    }
+    novas.push({ x, y, delay:s.delay+i*0.12, totalDelay:s.delay+i*0.12, dmg:s.damage, radius:s.radius, weaponId:w.id, evolved:w.evolved });
+  }
 }
 function updateNovas(dt){
   for(let i=novas.length-1;i>=0;i--){
@@ -723,6 +825,7 @@ function fireChain(w, s){
   let last = {x:player.x,y:player.y};
   const excluded = new Set();
   const segs = [];
+  const color = w.evolved ? '#ffffff' : def.color;
   for(let i=0;i<Math.round(s.chainCount);i++){
     let best=null, bd=Infinity;
     for(const en of enemies){
@@ -732,10 +835,15 @@ function fireChain(w, s){
     }
     if(!best) break;
     damageEnemy(best, s.damage);
+    spawnBurst(best.x,best.y, color, w.evolved?10:6, 130, 0.3);
     segs.push({from:{x:last.x,y:last.y}, to:{x:best.x,y:best.y}});
     excluded.add(best); last = {x:best.x,y:best.y};
   }
-  if(segs.length){ lightningFX.push({segments:segs, life:0.25, maxLife:0.25, color: w.evolved?'#ffffff':def.color, evolved:w.evolved}); }
+  if(segs.length){ lightningFX.push({segments:segs, life:0.32, maxLife:0.32, color, evolved:w.evolved}); }
+  if(w.evolved && def.evo.chainCountAdd){
+    // Chain Lightning Array: persistent web feel - leaves a brief lingering glow at every node
+    for(const seg of segs){ spawnBurst(seg.to.x, seg.to.y, '#eaffff', 3, 40, 0.5); }
+  }
 }
 
 function dropMine(w, s){
@@ -953,10 +1061,13 @@ function drawProjectiles(){
 }
 function drawContinuousBeams(){
   for(const w of player.weapons){
+    const def = WEAPON_DEFS[w.id];
+    const evoCat = w.evolved && def.evo.category;
+    const cat = evoCat || def.category;
+    if(cat!=='beam_continuous'){ continue; }
     if(w.beamTarget){
-      const def = WEAPON_DEFS[w.id];
       ctx.save();
-      ctx.strokeStyle = w.evolved?def.evo.color:def.color; ctx.lineWidth=3;
+      ctx.strokeStyle = def.color; ctx.lineWidth=3;
       ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur=10; ctx.globalAlpha=0.85;
       ctx.beginPath(); ctx.moveTo(player.x,player.y); ctx.lineTo(w.beamTarget.x,w.beamTarget.y); ctx.stroke();
       ctx.restore();
@@ -1136,6 +1247,13 @@ function applyDamageToPlayer(dmg){
 function killEnemy(index){
   const en = enemies[index];
   spawnBurst(en.x,en.y, en.isBoss?'#ffe066':(en.flyer ? '#c58bff' : '#ffd76a'), en.isBoss?60:10, en.isBoss?260:140, en.isBoss?0.9:0.4);
+  if(en.isFinalBoss){
+    spawnBurst(en.x,en.y,'#1e9628',80,300,1.2);
+    spawnBurst(en.x,en.y,'#ffffff',50,260,1.0);
+    enemies.splice(index,1);
+    triggerVictory();
+    return;
+  }
   if(en.explodeOnDeath){
     for(const other of enemies.slice()){ if(other!==en && dist2(en.x,en.y,other.x,other.y) < 60*60){ damageEnemy(other, 14); } }
     if(dist2(en.x,en.y,player.x,player.y) < 60*60 && player.invulTimer<=0){ applyDamageToPlayer(10); player.invulTimer=0.4; }
@@ -1153,7 +1271,9 @@ function drawEnemies(){
     const flash = en.hitFlash>0;
     ctx.save(); ctx.translate(en.x,en.y);
     if(en.frozenTimer>0){ ctx.filter='brightness(1.6) saturate(0.3)'; }
-    if(en.isBoss){
+    if(en.isFinalBoss){
+      drawFinalBoss(ctx, 0, 0, elapsed, en.hitFlash);
+    } else if(en.isBoss){
       ctx.rotate(en.phase*0.15);
       const spikes=10;
       ctx.fillStyle = flash?'#ffffff':en.color;
@@ -1181,14 +1301,14 @@ function drawEnemies(){
     ctx.restore();
 
     if(en.hp < en.maxHp){
-      const bw = en.isBoss ? 60 : en.r*2;
-      ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(en.x-bw/2, en.y-en.r-12, bw, en.isBoss?5:3);
-      ctx.fillStyle = en.isBoss?'#ffe066':'#ff5b3d';
-      ctx.fillRect(en.x-bw/2, en.y-en.r-12, bw*clamp(en.hp/en.maxHp,0,1), en.isBoss?5:3);
+      const bw = en.isFinalBoss ? 110 : (en.isBoss ? 60 : en.r*2);
+      ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(en.x-bw/2, en.y-en.r-14, bw, en.isBoss?6:3);
+      ctx.fillStyle = en.isFinalBoss?'#1e9628':(en.isBoss?'#ffe066':'#ff5b3d');
+      ctx.fillRect(en.x-bw/2, en.y-en.r-14, bw*clamp(en.hp/en.maxHp,0,1), en.isBoss?6:3);
     }
     if(en.isBoss){
-      ctx.save(); ctx.font="10px 'Press Start 2P'"; ctx.fillStyle='#ffe066'; ctx.textAlign='center';
-      ctx.fillText(en.bossName, en.x, en.y-en.r-18); ctx.restore();
+      ctx.save(); ctx.font=(en.isFinalBoss?"12px":"10px")+" 'Press Start 2P'"; ctx.fillStyle=en.isFinalBoss?'#1e9628':'#ffe066'; ctx.textAlign='center';
+      ctx.fillText(en.bossName, en.x, en.y-en.r-22); ctx.restore();
     }
   }
 }
@@ -1244,6 +1364,7 @@ function applyPassiveImmediate(id, level){
 }
 
 let evolutionQueue = [];
+let pendingFinalBoss = false;
 function checkEvolutions(){
   for(const w of player.weapons){
     if(w.evolved) continue;
@@ -1251,6 +1372,7 @@ function checkEvolutions(){
     const passive = player.passives.find(p=>p.id===def.evoPartner);
     if(w.level>=9 && passive && passive.level>=6){
       w.evolved = true;
+      w.beamTarget = null;
       evolutionQueue.push(w);
     }
   }
@@ -1268,6 +1390,10 @@ function checkSuitTier(){
     suitBanner.textContent = currentPalette().label + ' 起動！';
     suitBanner.classList.add('show');
     setTimeout(()=>{ suitBanner.classList.remove('show'); }, 1800);
+  }
+  if(cnt>=6 && !player.finalBossTriggered){
+    player.finalBossTriggered = true;
+    pendingFinalBoss = true;
   }
 }
 
@@ -1346,9 +1472,37 @@ function afterCardApplied(){
 }
 function proceedAfterMenus(){
   if(evolutionQueue.length>0){ const w = evolutionQueue.shift(); showEvolutionAnnouncement(w); return; }
+  if(pendingFinalBoss){ pendingFinalBoss=false; showFinalBossAnnouncement(); return; }
   if(levelUpQueue>0){ openLevelUp(); return; }
   state = 'playing';
 }
+const bossAnnounceEl = $('boss-announce');
+function showFinalBossAnnouncement(){
+  state = 'evolution';
+  bossAnnounceEl.classList.remove('hidden');
+  setTimeout(()=>{
+    bossAnnounceEl.classList.add('hidden');
+    spawnFinalBoss();
+    proceedAfterMenus();
+  }, 2600);
+}
+function spawnFinalBoss(){
+  const diff = getDifficulty(elapsed);
+  enemies.push({
+    x: W/2, y: -80, typeId:'finalBoss', r:52, hp:16000*Math.max(1,diff.hp*0.5), maxHp:16000*Math.max(1,diff.hp*0.5),
+    speed:50, dmg:34, flyer:false, color:'#1e9628', phase:0, hitFlash:0, isBoss:true, isFinalBoss:true,
+    bossName:'QUEEN METROID', speedMult:1, slowTimer:0, frozenTimer:0,
+  });
+}
+function triggerVictory(){
+  state = 'victory';
+  const m = Math.floor(elapsed/60), s = Math.floor(elapsed%60);
+  $('vic-time').textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  $('vic-level').textContent = player.level;
+  $('vic-suit').textContent = currentPalette().label;
+  $('victory-overlay').classList.remove('hidden');
+}
+$('btn-victory-restart').addEventListener('click', startGame);
 function showEvolutionAnnouncement(w){
   state = 'evolution';
   const def = WEAPON_DEFS[w.id];
@@ -1390,13 +1544,14 @@ function resetGame(){
   player.baseSpeed=190; player.baseMagnetRadius=90;
   player.weapons=[{id:'powerBeam', level:1, evolved:false, timer:0}];
   player.passives=[];
-  player.suitTier='power'; player.invulTimer=0; player.reserveCharges=0;
-  enemies=[]; gems=[]; projectiles=[]; particles=[]; bombs=[]; novas=[]; mines=[]; pulses=[]; lightningFX=[];
-  spawnTimer=0.6; elapsed=0; levelUpQueue=0; evolutionQueue=[]; bossSpawned={};
+  player.suitTier='power'; player.invulTimer=0; player.reserveCharges=0; player.finalBossTriggered=false;
+  enemies=[]; gems=[]; projectiles=[]; particles=[]; bombs=[]; novas=[]; mines=[]; pulses=[]; lightningFX=[]; blastRings=[];
+  spawnTimer=0.6; elapsed=0; levelUpQueue=0; evolutionQueue=[]; pendingFinalBoss=false; bossSpawned={};
 }
 
 function startGame(){
   resetGame(); state='playing';
+  bossAnnounceEl.classList.add('hidden'); $('victory-overlay').classList.add('hidden');
   startOverlay.classList.add('hidden'); gameoverOverlay.classList.add('hidden');
   refreshSlotBar();
 }
