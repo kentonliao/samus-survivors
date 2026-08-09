@@ -305,11 +305,18 @@ function drawBackground(t, playerX, playerY){
    粒子
 ========================================================= */
 let particles = [];
+const MAX_PARTICLES = 420;
+const MAX_PROJECTILES = 260;
 function spawnBurst(x,y,color,count,speed,life){
+  if(particles.length > MAX_PARTICLES){ particles.splice(0, particles.length-MAX_PARTICLES+count); }
   for(let i=0;i<count;i++){
     const a = rand(0,Math.PI*2); const sp = rand(speed*0.3,speed);
     particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life,maxLife:life,color,size:rand(2,4)});
   }
+}
+function pushProjectile(p){
+  if(projectiles.length >= MAX_PROJECTILES){ projectiles.shift(); }
+  projectiles.push(p);
 }
 function updateParticles(dt){
   for(let i=particles.length-1;i>=0;i--){
@@ -578,7 +585,7 @@ function fireProjectileVolley(w, s){
   const spread = def.spreadAngle!==undefined ? def.spreadAngle : 0.16;
   for(let i=0;i<count;i++){
     const ang = baseAng + (i-(count-1)/2)*spread;
-    projectiles.push({
+    pushProjectile({
       x:player.x, y:player.y, vx:Math.cos(ang)*s.speed, vy:Math.sin(ang)*s.speed,
       dmg:s.damage, r:4, pierce:Math.round(s.pierce), life:1.6,
       color: w.evolved ? def.evo.color : def.color, wavy: def.wavy||false, age:0,
@@ -594,7 +601,7 @@ function fireRadialBurst(w, s){
   const count = w.evolved ? 18 : Math.max(1, Math.round(s.count)*3);
   for(let i=0;i<count;i++){
     const ang = (Math.PI*2/count)*i;
-    projectiles.push({ x:player.x,y:player.y, vx:Math.cos(ang)*(s.speed||460), vy:Math.sin(ang)*(s.speed||460),
+    pushProjectile({ x:player.x,y:player.y, vx:Math.cos(ang)*(s.speed||460), vy:Math.sin(ang)*(s.speed||460),
       dmg:s.damage, r:4, pierce:Math.round(s.pierce||4), life:1.1, color: def.evo.color, age:0,
       shape: def.shape||'star', evolved:true, weaponId:w.id });
   }
@@ -638,7 +645,7 @@ function fireHoming(w, s){
     if(!target) continue;
     const spread = targets.length<count ? (i-(count-1)/2)*0.3 : 0;
     const ang = Math.atan2(target.y-player.y, target.x-player.x) + spread;
-    projectiles.push({ x:player.x,y:player.y, vx:Math.cos(ang)*300, vy:Math.sin(ang)*300,
+    pushProjectile({ x:player.x,y:player.y, vx:Math.cos(ang)*300, vy:Math.sin(ang)*300,
       dmg:s.damage, r: w.evolved?8:6, homing:true, target, life:2.4, splash:s.splash, age:0,
       color: w.evolved?def.evo.color:def.color, evolved:w.evolved, isMissile:true, weaponId:w.id });
   }
@@ -792,7 +799,6 @@ function drawMines(){
     const spikes=6; const baseR = m.pulling?9:6;
     const spin = m.pulling ? elapsed*10 : 0;
     ctx.fillStyle = m.pulling ? '#e0c8ff' : (m.evolved?'#c8a0ff':'#a3e635');
-    ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 8;
     ctx.beginPath();
     for(let i=0;i<spikes*2;i++){ const rad=i%2===0?baseR:baseR*0.45; const a=(Math.PI/spikes)*i+spin; const px=Math.cos(a)*rad, py=Math.sin(a)*rad; if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
     ctx.closePath(); ctx.fill();
@@ -908,7 +914,6 @@ function drawProjectiles(){
     ctx.save();
     const ang = Math.atan2(p.vy,p.vx);
     ctx.translate(p.x,p.y); ctx.rotate(ang);
-    ctx.shadowColor = p.color||'#7ff0ff'; ctx.shadowBlur = p.evolved?16:(p.isMissile?12:8);
     ctx.fillStyle = p.color||'#dffcff';
 
     if(p.evolved){ ctx.globalAlpha=0.3; ctx.beginPath(); ctx.arc(0,0,11,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1; }
@@ -971,7 +976,7 @@ function drawOrbitEffects(){
       for(let i=0;i<blades;i++){
         const a = elapsed*5 + (Math.PI*2/blades)*i;
         ctx.save(); ctx.rotate(a);
-        ctx.globalAlpha=0.55; ctx.fillStyle=color; ctx.shadowColor=color; ctx.shadowBlur=10;
+        ctx.globalAlpha=0.55; ctx.fillStyle=color;
         ctx.beginPath(); ctx.moveTo(4,-3); ctx.lineTo(s.radius,-7); ctx.lineTo(s.radius,7); ctx.lineTo(4,3); ctx.closePath(); ctx.fill();
         ctx.restore();
       }
@@ -985,7 +990,7 @@ function drawOrbitEffects(){
       for(let i=0;i<blobs;i++){
         const a = elapsed*3 + (Math.PI*2/blobs)*i;
         const bx=Math.cos(a)*s.radius, by=Math.sin(a)*s.radius;
-        ctx.globalAlpha=0.65; ctx.fillStyle=color; ctx.shadowColor=color; ctx.shadowBlur=12;
+        ctx.globalAlpha=0.65; ctx.fillStyle=color;
         ctx.beginPath(); ctx.arc(bx,by, w.evolved?10:8, 0, Math.PI*2); ctx.fill();
       }
       ctx.globalAlpha=0.1; ctx.fillStyle=color;
@@ -1003,7 +1008,7 @@ let enemies = [];
 let gems = [];
 let spawnTimer = 0;
 let elapsed = 0;
-const MAX_ENEMIES = 340;
+const MAX_ENEMIES = 420;
 
 const DIFFICULTY_POINTS = [
   {t:0,   hp:1.0, dmg:1.0, spd:1.0, spawn:1.1},
@@ -1082,8 +1087,8 @@ function updateEnemies(dt){
   spawnTimer -= dt;
   if(spawnTimer<=0 && enemies.length<MAX_ENEMIES){
     spawnTimer = diff.spawn;
-    const batch = 1 + Math.floor(elapsed/240);
-    for(let i=0;i<Math.min(batch,5) && enemies.length<MAX_ENEMIES;i++){ spawnEnemy(); }
+    const batch = 1 + Math.floor(elapsed/180);
+    for(let i=0;i<Math.min(batch,6) && enemies.length<MAX_ENEMIES;i++){ spawnEnemy(); }
   }
 
   for(const entry of BOSS_TABLE){
@@ -1207,7 +1212,6 @@ function drawGems(){
   for(const g of gems){
     const bob = Math.sin(g.phase)*2;
     ctx.save(); ctx.translate(g.x,g.y+bob); ctx.rotate(Math.PI/4);
-    ctx.shadowColor='#4fd8ff'; ctx.shadowBlur=8;
     ctx.fillStyle = g.value>1 ? '#ffe27a' : '#4fd8ff';
     ctx.fillRect(-g.r,-g.r,g.r*2,g.r*2);
     ctx.restore();
@@ -1484,11 +1488,18 @@ function draw(){
   if(sig!==lastSlotSig){ lastSlotSig=sig; refreshSlotBar(); }
 }
 
+let errorCount = 0;
 function loop(ts){
   const dt = Math.min((ts-lastTime)/1000, 0.05) || 0;
   lastTime = ts;
-  if(state==='playing'){ update(dt); }
-  if(state==='playing' || state==='levelup' || state==='evolution'){ draw(); }
+  try{
+    if(state==='playing'){ update(dt); }
+    if(state==='playing' || state==='levelup' || state==='evolution'){ draw(); }
+  } catch(err){
+    errorCount++;
+    console.error('[Samus Survivors] frame error, recovered:', err);
+    if(errorCount>200 && enemies.length>0){ enemies.length=0; projectiles.length=0; particles.length=0; }
+  }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
