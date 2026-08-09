@@ -224,7 +224,7 @@ const SAMUS_ROWS = [
   "..KKKKKKKKKK....KKKKKKKKKK.",
 ];
 const SAMUS_WIDTH = 27;
-const SAMUS_UNIT = 2.0;
+const SAMUS_UNIT = 1.55;
 const SAMUS_LEG_ROW = 22;
 const SAMUS_LEG_SPLIT = 13;
 
@@ -418,7 +418,7 @@ const PASSIVE_DEFS = {
    玩家
 ========================================================= */
 const player = {
-  x:W/2, y:H/2, r:10,
+  x:W/2, y:H/2, r:8,
   baseSpeed:190, speed:190,
   hp:100, maxHp:100,
   level:1, xp:0, xpToNext:10,
@@ -746,7 +746,7 @@ function updateMines(dt){
   for(let i=mines.length-1;i>=0;i--){
     const m = mines[i];
     m.life -= dt;
-    if(m.life<=0){ mines.splice(i,1); continue; }
+    if(m.life<=0){ explodeMine(m); mines.splice(i,1); continue; }
     if(!m.pulling){
       for(const en of enemies){
         if(dist2(m.x,m.y,en.x,en.y) < m.triggerRadius*m.triggerRadius){
@@ -1003,7 +1003,7 @@ let enemies = [];
 let gems = [];
 let spawnTimer = 0;
 let elapsed = 0;
-const MAX_ENEMIES = 220;
+const MAX_ENEMIES = 340;
 
 const DIFFICULTY_POINTS = [
   {t:0,   hp:1.0, dmg:1.0, spd:1.0, spawn:1.1},
@@ -1080,7 +1080,11 @@ function spawnBoss(entry){
 function updateEnemies(dt){
   const diff = getDifficulty(elapsed);
   spawnTimer -= dt;
-  if(spawnTimer<=0 && enemies.length<MAX_ENEMIES){ spawnTimer = diff.spawn; spawnEnemy(); }
+  if(spawnTimer<=0 && enemies.length<MAX_ENEMIES){
+    spawnTimer = diff.spawn;
+    const batch = 1 + Math.floor(elapsed/240);
+    for(let i=0;i<Math.min(batch,5) && enemies.length<MAX_ENEMIES;i++){ spawnEnemy(); }
+  }
 
   for(const entry of BOSS_TABLE){
     if(elapsed>=entry.t && !bossSpawned[entry.t]){ bossSpawned[entry.t]=true; spawnBoss(entry); }
@@ -1274,18 +1278,31 @@ function gainXp(v){
   }
 }
 
+const PASSIVE_TO_WEAPONS = {};
+for(const wid of WEAPON_ORDER){
+  const pid = WEAPON_DEFS[wid].evoPartner;
+  (PASSIVE_TO_WEAPONS[pid] = PASSIVE_TO_WEAPONS[pid]||[]).push(wid);
+}
+
 function cardLabel(kind, id){
   if(kind==='newWeapon' || kind==='upgradeWeapon'){
     const def = WEAPON_DEFS[id];
     const owned = player.weapons.find(w=>w.id===id);
     const lvl = owned?owned.level:0;
-    return { emoji:def.emoji, name:def.name, lv: kind==='newWeapon' ? '【首次獲得】' : ('Lv.'+lvl+' → '+(lvl+1)),
-      desc: kind==='newWeapon' ? '新主武器（進化搭檔：'+PASSIVE_DEFS[def.evoPartner].name+'）' : ('強化中，滿級9並集滿搭檔可進化為 '+def.evo.name) };
+    const partnerDef = PASSIVE_DEFS[def.evoPartner];
+    const partnerOwned = player.passives.find(p=>p.id===def.evoPartner);
+    const partnerLv = partnerOwned?partnerOwned.level:0;
+    const evoLine = `進化搭檔：${partnerDef.emoji}${partnerDef.name}(${partnerLv}/6) → ${def.evo.emoji} ${def.evo.name}`;
+    return { emoji:def.emoji, name:def.name, lv: kind==='newWeapon' ? '【首次獲得】' : ('Lv.'+lvl+' → '+(lvl+1)+' / 9'), desc: evoLine };
   } else {
     const def = PASSIVE_DEFS[id];
     const owned = player.passives.find(p=>p.id===id);
     const lvl = owned?owned.level:0;
-    return { emoji:def.emoji, name:def.name, lv: kind==='newPassive' ? '【首次獲得】' : ('Lv.'+lvl+' → '+(lvl+1)), desc: def.desc };
+    const weaponIds = PASSIVE_TO_WEAPONS[id]||[];
+    const evoLine = weaponIds.length
+      ? (def.desc + '｜可進化：' + weaponIds.map(wid=>WEAPON_DEFS[wid].emoji+WEAPON_DEFS[wid].name).join('、'))
+      : def.desc;
+    return { emoji:def.emoji, name:def.name, lv: kind==='newPassive' ? '【首次獲得】' : ('Lv.'+lvl+' → '+(lvl+1)+' / 6'), desc: evoLine };
   }
 }
 
