@@ -188,7 +188,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = 'v0.8 · 2026-08-10 · 波動光束改向系統＋受擊變白修正＋經驗晶體整合';
+const GAME_VERSION = 'v0.9 · 2026-08-10 · 修正自爆連鎖當機根因＋升級佇列卡死＋頭目消失';
 const W = 960, H = 600;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -412,7 +412,7 @@ function drawBackground(t, playerX, playerY){
 ========================================================= */
 let particles = [];
 const MAX_PARTICLES = 420;
-const MAX_PROJECTILES = 260;
+const MAX_PROJECTILES = 420; // 260在六武器全進化時會被力量光束佔滿，其他武器的彈幕被擠掉看不見
 function spawnBurst(x,y,color,count,speed,life){
   if(particles.length > MAX_PARTICLES){ particles.splice(0, particles.length-MAX_PARTICLES+count); }
   for(let i=0;i<count;i++){
@@ -686,6 +686,7 @@ function nearestEnemy(x,y){
 }
 
 function damageEnemy(en, dmg){
+  if(en.dead) return;
   en.hp -= dmg; en.hitFlash = 0.15;
   if(en.hp<=0){ const idx = enemies.indexOf(en); if(idx>=0) killEnemy(idx); }
 }
@@ -1289,11 +1290,13 @@ function applyDamageToPlayer(dmg){
 
 function killEnemy(index){
   const en = enemies[index];
+  if(en.dead) return;
+  en.dead = true;
+  enemies.splice(index,1); // 必須先移除：自爆等死亡效果若再傷到彼此，會無限遞迴（相鄰自爆蟲互殺爆栈）
   spawnBurst(en.x,en.y, en.isBoss?'#ffe066':(en.flyer ? '#c58bff' : '#ffd76a'), en.isBoss?60:10, en.isBoss?260:140, en.isBoss?0.9:0.4);
   if(en.isFinalBoss){
     spawnBurst(en.x,en.y,'#1e9628',80,300,1.2);
     spawnBurst(en.x,en.y,'#ffffff',50,260,1.0);
-    enemies.splice(index,1);
     triggerVictory();
     return;
   }
@@ -1314,7 +1317,6 @@ function killEnemy(index){
   } else {
     gems.push({x:en.x+rand(-20,20), y:en.y+rand(-20,20), vx:0, vy:0, value:gemVal, r:5, phase:rand(0,7)});
   }
-  enemies.splice(index,1);
 }
 
 function drawEnemies(){
@@ -1501,9 +1503,16 @@ function cardLabel(kind, id){
 }
 
 function openLevelUp(){
+  const pool = buildCardPool();
+  if(pool.length===0){
+    // 全欄位滿級：升級已無可選項目，直接清空整條升級佇列，不逐一顯示空畫面卡住玩家
+    levelUpQueue = 0;
+    levelupOverlay.classList.add('hidden');
+    proceedAfterMenus();
+    return;
+  }
   state = 'levelup';
   levelupOverlay.classList.remove('hidden');
-  const pool = buildCardPool();
   for(let i=pool.length-1;i>0;i--){ const j=randInt(0,i); [pool[i],pool[j]]=[pool[j],pool[i]]; }
   const picks = pool.slice(0,3);
   cardsEl.innerHTML='';
@@ -1514,10 +1523,6 @@ function openLevelUp(){
     el.innerHTML = `<div class="card-emoji">${info.emoji}</div><div class="card-name">${info.name}</div><div class="card-lv">${info.lv}</div><div class="card-desc">${info.desc}</div>`;
     el.addEventListener('click', ()=>{ applyCard(card); afterCardApplied(); });
     cardsEl.appendChild(el);
-  }
-  if(picks.length===0){
-    cardsEl.innerHTML = '<div class="card-desc" style="font-size:14px;">目前所有欄位已滿且滿級，請等待進化！</div>';
-    setTimeout(()=>{ afterCardApplied(); }, 900);
   }
 }
 
@@ -1535,6 +1540,8 @@ function afterCardApplied(){
   proceedAfterMenus();
 }
 function proceedAfterMenus(){
+  // 勝利/失敗/未開始時不得把狀態拉回選單或遊玩（避免舊計時器蓋掉結局畫面）
+  if(state==='victory' || state==='gameover' || state==='start') return;
   if(evolutionQueue.length>0){ const w = evolutionQueue.shift(); showEvolutionAnnouncement(w); return; }
   if(pendingFinalBoss){ pendingFinalBoss=false; showFinalBossAnnouncement(); return; }
   if(levelUpQueue>0){ openLevelUp(); return; }
@@ -1544,7 +1551,9 @@ const bossAnnounceEl = $('boss-announce');
 function showFinalBossAnnouncement(){
   state = 'evolution';
   bossAnnounceEl.classList.remove('hidden');
+  const rid = gameRunId;
   setTimeout(()=>{
+    if(rid!==gameRunId) return; // 玩家已重新開始新的一局，舊計時器作廢
     bossAnnounceEl.classList.add('hidden');
     spawnFinalBoss();
     proceedAfterMenus();
@@ -1575,7 +1584,8 @@ function showEvolutionAnnouncement(w){
   evoDesc.textContent = def.evo.desc;
   evoOverlay.classList.remove('hidden');
   spawnBurst(player.x,player.y, def.evo.color, 50, 240, 1.0);
-  setTimeout(()=>{ evoOverlay.classList.add('hidden'); proceedAfterMenus(); }, 2200);
+  const rid = gameRunId;
+  setTimeout(()=>{ if(rid!==gameRunId) return; evoOverlay.classList.add('hidden'); proceedAfterMenus(); }, 2200);
 }
 
 /* =========================================================
@@ -1583,6 +1593,7 @@ function showEvolutionAnnouncement(w){
 ========================================================= */
 let state = 'start';
 let lastTime = 0;
+let gameRunId = 0; // 每局+1，用來讓上一局殘留的公告計時器失效
 
 function refreshSlotBar(){
   weaponSlotsEl.innerHTML=''; passiveSlotsEl.innerHTML='';
@@ -1603,6 +1614,8 @@ function refreshSlotBar(){
 }
 
 function resetGame(){
+  gameRunId++;
+  errorCount = 0;
   player.x=W/2; player.y=H/2; player.hp=100; player.maxHp=100;
   player.level=1; player.xp=0; player.xpToNext=10;
   player.baseSpeed=190; player.baseMagnetRadius=90;
@@ -1718,7 +1731,7 @@ function loop(ts){
   } catch(err){
     errorCount++;
     console.error('[Samus Survivors] frame error, recovered:', err);
-    if(errorCount>200 && enemies.length>0){ enemies.length=0; projectiles.length=0; particles.length=0; }
+    if(errorCount>200 && enemies.length>0){ enemies = enemies.filter(e=>e.isBoss); projectiles.length=0; particles.length=0; } // 自救時保留頭目，避免結局被跳過
   }
   requestAnimationFrame(loop);
 }
