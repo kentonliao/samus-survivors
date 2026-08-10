@@ -188,7 +188,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = 'v0.9.1 · 2026-08-10 · 連鎖波動改為自動旋轉密集光束陣列';
+const GAME_VERSION = 'v1.0 · 2026-08-10 · 全敵人像素圖重製（銀河戰士圖鑑取樣）';
 const W = 960, H = 600;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -215,6 +215,351 @@ function mixWhite(hex, amt){
   const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
   const nr = Math.round(r+(255-r)*amt), ng = Math.round(g+(255-g)*amt), nb = Math.round(b+(255-b)*amt);
   return `rgb(${nr},${ng},${nb})`;
+}
+
+/* =========================================================
+   敵人像素圖（自使用者提供的圖鑑參考圖逐像素取樣重建）
+   小敵人以中位數分塊降採樣、7色量化；快取為離屏canvas，
+   每幀只做drawImage，600隻同屏也比舊的向量繪製快
+========================================================= */
+const ENEMY_SPRITES = {
+  zeela:{ pal:{A:'#cccc35',B:'#c8a000',C:'#768029',D:'#7a5804',E:'#384810',F:'#404000',G:'#283800'}, rows:[
+    "...............DBD..",
+    "..............D.ABD.",
+    "...DBD........D..BD.",
+    "..DBA.D.......DBBDD.",
+    "..DB..D........DDD..",
+    "..DDBBD.......C.....",
+    "...DDD.......EC.....",
+    "......E.CGGC.C.GE...",
+    "..EGC.C.CAAC.E.CGE..",
+    "..CGC.E........CGC..",
+    "..GGA...FDDF...AGG..",
+    ".CCA..FF....FF..ACC.",
+    "BF..FD.DDBBDD.DF.FB.",
+    "BF.BFFF......FFB.FB.",
+    "FF.AF..FFDDFF.FA.FFB",
+    "F..BF.........FB..FA",
+    "F.................FB",
+  ]},
+  skree:{ pal:{A:'#c0d360',B:'#80a870',C:'#689058',D:'#588040',E:'#305820',F:'#204810',G:'#103800'}, rows:[
+    ".......B......B.......",
+    ".......A.B..B.A.......",
+    ".......E.A..A.E.......",
+    ".G.......E..E.......G.",
+    ".G......F....F......G.",
+    ".EG....FCE..ECF....GE.",
+    ".CG.....BCFFCB.....GC.",
+    ".CE......FGGF......EC.",
+    ".AEG.....GCCG.....GEA.",
+    ".AEG.....G..G.....GEA.",
+    ".CCG...GF.EE.FG...GCC.",
+    ".ECEGE..FEBBEF..EGECE.",
+    "..CEE..DBFDDFBD..EEC..",
+    "..CEE....BFFB....EEC..",
+    "..CCE.....DD.....ECC..",
+    "..ECE............ECE..",
+    "...CE............EC...",
+    "...CEA...FDDF...AEC...",
+  ]},
+  ripper:{ pal:{A:'#9b9055',B:'#e82800',C:'#901017',D:'#9a0000',E:'#700000',F:'#580000',G:'#400000'}, rows:[
+    ".........EEDBBDEF...EF........",
+    ".......EFDBBBBBBDEF.D.........",
+    "....EBBDFBBBBBBDEF.BF.........",
+    "......EBDEDDDDDEF.BF..........",
+    "..EDBF.EBDFDFDFF.DF...........",
+    ".DB..F..EB.F.F..DF.E.E........",
+    "E..GG.F.FED...DEF..BGB..AACF..",
+    ".FGAAG...EDBDEG..D.D.D.AAAACCC",
+    ".BFGG..D.GG.G...G.EGGE.CACC...",
+    "DD.F.BD.F...E.G..GE.E.E.......",
+    ".........D..D..D..G.G.G.......",
+    "........GD..D..E..............",
+    "........D..DG.D...............",
+  ]},
+  reo:{ pal:{A:'#f2f256',B:'#b8b830',C:'#00cf10',D:'#94940c',E:'#028000',F:'#3a5b3f',G:'#003f16'}, rows:[
+    "..G..GGG..............GGGG.GG.",
+    ".GCGGCCEG............GECCCGCC.",
+    ".ECCGCCCEG..........GECCCCCCC.",
+    ".GCCCCC.BF..........FBBCCCCCC.",
+    ".GCGGCCG.BF........FBBGCCCGCC.",
+    ".ECEGBCG.AF........FAAGCBBECC.",
+    "ECCEEGAG.BF........FBBGAAEECCE",
+    "EECCEG.BE.BF......FBBEBBGECCCE",
+    ".GCEFG.BEG.BF....FBBGEBBGFDCC.",
+    ".GEG.FBBGG.BAF..FAABGGBBBFGEE.",
+    "..G.C...B.F..BFFBB.FFBB..CCGG.",
+    "...GE.EG.B..B.BBBBB.BBGEEEEG..",
+    "..........FF.BBABBFFF.........",
+    "..........FF..BBB.FFF.........",
+    "..........FFF.FF.FFFF.........",
+    "...DD.....FFFF...FFF......D...",
+    "..DDA...ABD.FFFAFF..BA...ADD..",
+    ".FDDAD..ABD.A.FBF...DBA..AADD.",
+    ".DBABBDDBD..A.FB.AA..DDDDBAAD.",
+    "FBAABBDDF...A........FFDDBAABD",
+    "BBAABDDFBAA.........ABFDDDBAAB",
+    "BFB.DD..BAAA.......AAB..DDD.BB",
+    "DFBBDD...BBA......ABB....DBBBD",
+    "BDBA.......B..............ABBD",
+    "BDAA.......................ABB",
+    "B.AA.......................AA.",
+    "...BA.....................AB..",
+  ]},
+  puyo:{ pal:{A:'#f0e890',B:'#d0c828',C:'#b09800',D:'#907800',E:'#685000',F:'#503800'}, rows:[
+    ".......FFBF.FFAA",
+    ".......FBABFFBAA",
+    "....FF.FCBCFEBBE",
+    "...FFEECECEEBCFF",
+    "...FECBCBEEBCEF.",
+    "FF.FCBABCCBCE...",
+    "FCCFBCBDCCCCEE.F",
+    "BABCBDDCBCBBEECE",
+    "CCEEBBBABCACCBAB",
+    "FFEECBCCCCCEDDCE",
+    "..ECBCBBCCCCEFFF",
+    "..FBCCCBCCCDEF..",
+    ".FECEECCCEDDCF..",
+    "..FEEFECBEE.CBFF",
+    "..FFFFCAEF.FEAAC",
+    ".....FCCFF..FECB",
+  ]},
+  sciser:{ pal:{A:'#9be3a8',B:'#f8b078',C:'#68a878',D:'#408058',E:'#307048',F:'#9c1000',G:'#003000'}, rows:[
+    ".......E.............E......",
+    "......ECEEEG.....GEEECE.....",
+    "......EAECCDG...GDCCEAE.....",
+    "...GDDDAAAACDG.GDCAAAADDDG..",
+    "...GADCAACEG.....GECAACDAG..",
+    "...GDAAAC..........GCAAADG..",
+    "...GDACEEG.........GEECADG..",
+    "...GDADGEDEE.....EEDEGDADG..",
+    "...GECEGEDEG.....GEDEGECEG..",
+    "...DADEGCGGG.....GGCCGEDAD..",
+    "...DAGGGCDEGGGGGGGECCGGGAD..",
+    "...DCDGGEEDDEEEEEDEEEGGDCD..",
+    "...GCDDGCAACEEGEECAACGDDCG..",
+    "...GADGGCCAACFFFCACCCGGDAG..",
+    "...DADGGGGCAABBBAAEGGGGDAD..",
+    "..GCCGDGFFEAAFFFAAGFFGDGCCG.",
+    ".GGADGCGFBFCAAGAACFBFGCGDAGG",
+    ".CGCDGC.GFFECAAACEFFG.CGDCGC",
+    ".CGDGGC..GGGGECEGGGG..CGGDGC",
+    ".DGDGGD..GEEGGGGGEEG..DGGDGD",
+    ".G.G..G...EE.....EG...G..G..",
+  ]},
+  rinka:{ pal:{A:'#e8ff14',B:'#f2cc08',C:'#ff9900',D:'#ff6600',E:'#ff3300',F:'#ff0000',G:'#cc0000'}, rows:[
+    ".....FFFF.....",
+    "...FFDBBDGF...",
+    "..FDCBABCCDF..",
+    ".FDCABBBAACDF.",
+    ".FCABDFFDBACF.",
+    "FDBADG..FDABDF",
+    "FBBBF....FCBCF",
+    "FBABF....FBABF",
+    "FCBBF....GBBCF",
+    "FBACF....FBBBF",
+    "FDCADF..FDACDG",
+    ".FBBBDFFDCBBF.",
+    ".GDCAACBAABDF.",
+    "..FDCBABCBDF..",
+    "...FFECBDFF...",
+    ".....GFFF.....",
+  ]},
+  kraid:{ pal:{A:'#f8e090',B:'#b8c878',C:'#63a35f',D:'#408048',E:'#306838',F:'#2a4820',G:'#2b2e11'}, rows:[
+    "...................DDDBED...............",
+    "..................DDDDEDEDD.............",
+    "................DDEEEDEEEEDDD...........",
+    "...............DEDEEDEDGFEEFED..........",
+    "...............CDEDEFDD.GFEFFF..........",
+    "..............DGGEEEFDDDDD.GGG..........",
+    "............B.EGCDEEFDDD................",
+    "............DFDCCCBCDDDDD...............",
+    "............BCCFGBADEDDEDF..............",
+    ".............GGGBADDDEFFFGG.............",
+    ".............GCBBBBCEDEFG.GG............",
+    "............BABCAAABDCDEFGGG............",
+    "CEEE........BBBAAAABCEEFFGG.............",
+    "...DF.......CBAAAAACEDFF................",
+    "..DDDEED...CAAAAAABCDDDFG...............",
+    ".EFEEFFEFDBAAAAABBCDDDDEFEFF............",
+    "C.....FFFEEAAAAABCDEEEFF.EG.............",
+    ".......FFFFFDDAABCDEGDEFE.G.............",
+    ".......DBEGGGFEDECCDDDEF.EGG............",
+    ".......CBBABGGGFFEDDFEE..FGF............",
+    "........CCCCBBEGGGFFDGG.FFF.............",
+    ".......DBBBBCCCBCGGFEEFG................",
+    "......DCBAAAACDDDDDFFEFFFG..............",
+    "......DBAAAAABCDEFFGFFFDFFF.............",
+    "......BBAAAAAABDDEEFFFDEGF..............",
+    ".....DCBAAAAAABCDDEFFGEFF.G.............",
+    ".....DDBAAAAAABCDDEEFGEGFF..............",
+    ".....CBBAAAAAABCDDEEFGFG..G.............",
+    "....CAAAAAAAAABCDDDEFFGGFGFG............",
+    "...CBAAAAAAAAABDDDEEFGDEFG.G............",
+    "...CAAAAAAAAABBDDEEFFFEFEFG.............",
+    "..DBAAAAAAAABDDDDDEFFGFFGGG.............",
+    ".DDBAAAAAAABCDCDDEFEFGF.F...............",
+    "..CAAAAAAAACDEEFDDEEFFF.FFF.............",
+    "..CAAAAAAACDDCDEEFFEFGEDDFGF............",
+    ".DDBAAAAABDEEDFEEEGFG.EEFGF.............",
+    ".DDAAAAAACDDEDEEFGFGFGEEGGF.............",
+    ".CAAAAAABEDEEFFGEFFGG.GFEF..............",
+    ".CAAAAAACDDEFFGDFGG.FFFG.F..............",
+    ".CAAAAABDEEDFEFFGGEFFGGG.FFG............",
+    ".CAAAAADEDDEFFFGGFEFGG..EEGG............",
+    ".CAAAAACDDEEFFGEFFGGG.GGEDFGF...........",
+    ".CAAAAADEFFGFFGEFGGFGGG.FFGFG...........",
+    ".DCAAAADFFEGGF.FF.FGGG.G.EF.............",
+    ".CCAAAADFEE.FGFGGGFGG.F..G....G.GG.GG.GG",
+    "..BBAAABDDEFDDFG.GGGGEGGGGGGGGGGGGGGGGGG",
+    "..BBAAABDDDFDDGGGGGFFFGGGFGGGGGGGGGGGGGG",
+    "..CCAAABDDEDECGGGGGFFEFFDFFFFFFFFFFFFFFF",
+    "..DCBBBCCDDEEDFGGGGGFGEDDDDEEEEEEEEEEEEE",
+    "....CCCCDDDEDDDGGGGGGFEDDDDDDDDDDDDDDDDD",
+    "....DDDDDDEEDCDDEGGGGGFFEDDDCDDCDDCDDCDD",
+    "..DEDDDEEFEEDDBBDFGGFFEEEFDEDDDDDDDDDDED",
+    ".BCACEEFFEFFECCCDEFEE.....EFEFFEFFEFFEFF",
+    "CDBDEEDDDDDDEEDDE.......................",
+  ]},
+  crocomire:{ pal:{A:'#b57f5f',B:'#593018',C:'#f32810',D:'#a82010',E:'#702010',F:'#601810',G:'#3a1008'}, rows:[
+    "....................DDFFF.................",
+    "...................FGDDDDDFFF.............",
+    "................GGFCCCCCDCCCDDD...........",
+    "...............FDDDCDCCCDDFCCCF...........",
+    ".............FCCCDDFGGFDDDDDCCC...........",
+    "...........DCDCDFFFBAABFFDFDCCD...........",
+    ".........DDCFFDGAAGAAAA.DDFCDDD...........",
+    "........DCFDBAGAAAGBAABDDFDCFDD...........",
+    "......GDCFBGAAGBAA..BBFDFFDDDCCC..........",
+    ".....GDDDBA.BA..FDDDDDDFFFDDDCCF..........",
+    ".....FFFG...GFFDDDFFCCCFFGDDFDCD..........",
+    ".....FGGGGG..GFFGG.GDCDFGGDDFFDF..........",
+    ".....GFG...GGFFG.DCFDCDGGDDDDGF...........",
+    "......G....B.GGFDDDDFDFFDFDCDGFD..........",
+    "...........AABBGFGFDDDGCFFDCDFFDF.........",
+    "...........AAAABDDFFDDFFGFDDFFFDD.........",
+    "..........AAAABDFDDDDDDFFDCDFDFF..........",
+    ".........BAAAAFFFFDCCDFFFDCCDDFG..........",
+    ".........AAAABDDDDDDCDFFDFDCCFGG..........",
+    "........GAAAADDCCCFCCDFFDDFDDFF...........",
+    "........AAAAAFCCCCFCCDFFDFFFFGFF..........",
+    "........AAAABFDCDCGDDFFFDFFDFFG...........",
+    ".......GAAABFFDCDCGGGGFFGDFFGF............",
+    ".......BAAAAFDDDCDFDDGGFDFFFGD............",
+    ".......AAAAAFDFDDDFFFGGFFFFDGG............",
+    ".......AAAAAFDDDCFDCDGFFDFDFG.............",
+    ".......GAFDBBFDFFDGCDGDDCFFG..............",
+    ".......GADCDAFDFDCGFGDFFDFCDF.............",
+    "........ADCDDDDCDGGDDCDDDDDFDDD...........",
+    "........GBCGDCDFGFFDFFCDCDFBFFDD..........",
+    "GGGFDGG.GGFCDGGGBGFFGFCFCDGAAAFEDDD..DFBF.",
+    "GEDGDDDCCDDFFBGGGGG.BF..CF.GBAAABEEFEB....",
+    "AGEGGGFEDGG.BBGGGGAADDFDCDAA....AAAB......",
+    "G.A..B.A...........A..F..F................",
+  ]},
+  phantoon:{ pal:{A:'#adad6f',B:'#808040',C:'#6c6530',D:'#585820',E:'#413f08',F:'#303000',G:'#77001a'}, rows:[
+    "...........FDF................",
+    "..........FBABE...............",
+    "........FFEBABDFF.............",
+    "......F.FEDAAABEF.F...........",
+    ".....FFFFDDAAABDEFFFF.........",
+    "...FFFEFEDDAAADDDFEEFF........",
+    "..FFFFDEEBDAAADBDEEFFFF.......",
+    "..FEEEEEBBDAAADBBEEEEFF.......",
+    ".FFEDDDDBADBAADABBDBDEFF......",
+    "FFEEDBBAAABBABDAAAABDEEFF.....",
+    "FEEDBBAAAABBABDAAAABBDEEF.....",
+    "FEDBBBBAAABBABBAAAABBBDEF.....",
+    ".FEDBBBAAABBAABAAABBBDEF......",
+    "FFDDDBBBBBBBAABBBBBBDDDEF.....",
+    "EEDEDBBBBBBBAABBBBBBDEDEE.....",
+    "FFEEDDDDBDDAAADDDDDDDDEFF.....",
+    ".FEEEEEDDDDBABDDDDEEEEEF......",
+    "FEEFFFEEEEEBABEEEEEEFFEEF.....",
+    ".FFFFFFEEFFBABFFEEEFFFFF......",
+    ".F.FEFFFFFFBABFFFFFFEF.F......",
+    "...FFF.FEBBDABDBEF.FFF........",
+    "....F.FEBABBABBBBEF.F.........",
+    "..F...EDBDEDBDFDBBE....F......",
+    "..FEEFEBDEDEEEDEEBDFFEE.......",
+    ".EEEDDBD.BBDFDDB.DBBDFFE......",
+    "..D.FFFFDEGGGGGGBFFFFF.D......",
+    ".F.E.E.DDGECAAD.ED..EF.F......",
+    ".DDDFEFFGGAAAAAGGFFEF.DDD.....",
+    "..B.EFFDGGAAACAGGDEF..BD......",
+    "...B.EEDEGAACAAGGDE.BB........",
+    "..EEDD.DDGCAAACGDD.DDEE.......",
+    ".....EBDAEGEEEGGADBE..........",
+    ".....EEDDDDGDCDDDBEE..........",
+    ".....D.DEDDEEEDDED.B..........",
+    "....DFDEFD.DDBDDF.DED.........",
+    "...DDEE...DDEDDE..EEFD........",
+    ".........FFDFDEF..............",
+    ".....F....FDADF....F..........",
+    ".........F.DAD.F....F.........",
+    "....D....FEBABEF....D.........",
+    "....D.....DDDDDE....D.........",
+    "....D....FDDABDEF....D........",
+    "...DF....A.DD........B........",
+    "...DF................D........",
+  ]},
+  ridley:{ pal:{A:'#d8a3c3',B:'#d2768c',C:'#ac768c',D:'#c2434a',E:'#764061',F:'#a31139',G:'#4b1536'}, rows:[
+    "..............A.............................",
+    "...........EECAGEC..........................",
+    "........ECAADDEACCAG........................",
+    ".....EECCAEDDD.CACCAG.......................",
+    "...EEACCCCCGCC.CEEECCA......................",
+    "..ECACCCCCA.AGCGCGGGEE......................",
+    "..CCC.AA..AGGGGGC...........................",
+    ".EE.A......GEEEC............................",
+    "...A.......CAEEG............................",
+    "..........ACEGGG............................",
+    "........ACE..EE..EC.........................",
+    ".......CCC...CA.ACE.........................",
+    ".......CC....CAAEEE.EE..G...................",
+    "............ECGEEEEECA.AADFFE...............",
+    ".............ECE.CECEAGFFFDDDE..............",
+    "..............E..CAAGEEFFFDDABD.............",
+    ".................ECEECCCDDDDFDDD............",
+    "................CAEACECCDFFFFDDCE...........",
+    "................CGGAACCCCBEAACE.............",
+    ".................GGEECACEA..................",
+    "...................EAAGE.A..................",
+    ".........EEE......CECEAAEA..................",
+    "........AE.EEEAEECCCG.ECEE..................",
+    "........AE...AEEEECCACEEAC.C................",
+    "........AE..EEAA.EEECACECEEGEEA.............",
+    "............EEEEE.EEECEECCEECGEEA...........",
+    "...................EEECCGGGCEEECGEC.A.......",
+    "..................EECEC..CGGCECCEAEGEC.C..C.",
+    "................ECAECEEE....EGEGEEGEAEEGEEGE",
+    "...............ECCEE.CECE...C.C...CGEGECGECG",
+    "..............ECCC.....EA..............EG.EG",
+    "...............C............................",
+  ]},
+};
+const BOSS_SPRITE_KEY = { 'KRAID':'kraid', 'CROCOMIRE':'crocomire', 'PHANTOON':'phantoon', 'RIDLEY':'ridley' };
+const spriteCache = {};
+function getSpriteCanvas(key, flash){
+  const ck = key + (flash?'|f':'');
+  if(spriteCache[ck]) return spriteCache[ck];
+  const def = ENEMY_SPRITES[key];
+  if(!def) return null;
+  const h = def.rows.length; let w = 0;
+  for(const r of def.rows){ w = Math.max(w, r.length); }
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const c = cv.getContext('2d');
+  for(let y=0;y<h;y++){
+    const row = def.rows[y];
+    for(let x=0;x<row.length;x++){
+      const ch = row[x];
+      if(ch === '.') continue;
+      c.fillStyle = flash ? mixWhite(def.pal[ch], 0.65) : def.pal[ch];
+      c.fillRect(x,y,1,1);
+    }
+  }
+  spriteCache[ck] = cv;
+  return cv;
 }
 
 /* =========================================================
@@ -1332,8 +1677,18 @@ function drawEnemies(){
     const flashColor = flash ? mixWhite(en.color, 0.65) : en.color;
     ctx.save(); ctx.translate(en.x,en.y);
     if(en.frozenTimer>0){ ctx.filter='brightness(1.6) saturate(0.3)'; }
+    const sprKey = en.isFinalBoss ? null : (en.isBoss ? BOSS_SPRITE_KEY[en.bossName] : en.typeId);
+    const spr = sprKey ? getSpriteCanvas(sprKey, flash) : null;
     if(en.isFinalBoss){
       drawFinalBoss(ctx, 0, 0, elapsed, en.hitFlash);
+    } else if(spr){
+      // 像素圖繪製：素材面向左，玩家在右側時水平翻面；走地型加上下擺動
+      // 寬高分別擬合：寬扁素材（如Ripper）不會因寬度而被整體縮小
+      const scale = Math.min((en.r*3.2)/spr.width, (en.r*2.2)/spr.height);
+      const bob = en.flyer ? Math.sin(en.phase)*1.5 : Math.sin(en.phase)*2;
+      if(player.x > en.x){ ctx.scale(-1,1); }
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(spr, -spr.width*scale/2, -spr.height*scale/2 + bob, spr.width*scale, spr.height*scale);
     } else if(en.isBoss){
       ctx.rotate(en.phase*0.15);
       const spikes=10;
