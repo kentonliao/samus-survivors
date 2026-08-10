@@ -97,6 +97,7 @@
 
   #flash{ position:absolute;top:0;left:0;width:100%;height:100%; background:#fff; opacity:0; pointer-events:none; z-index:15; }
   #controls-hint{ position:absolute; bottom:8px; left:50%; transform:translateX(-50%); font-size:12px; color:var(--text-dim); z-index:5; pointer-events:none; letter-spacing:1px; }
+  #version-tag{ position:absolute; bottom:10px; left:14px; font-size:11px; color:var(--text-dim); opacity:0.6; letter-spacing:1px; }
 </style>
 </head>
 <body>
@@ -138,6 +139,7 @@
         將武器練至滿級並進化，動力服也會隨進化數量華麗變身！
       </div>
       <div class="start-btn" id="btn-start">開始遊戲</div>
+      <div id="version-tag"></div>
     </div>
 
     <div id="levelup-overlay" class="overlay hidden">
@@ -186,6 +188,7 @@
 (function(){
 "use strict";
 
+const GAME_VERSION = 'v0.7 · 2026-08-10 · 敵人強度平衡＋終極頭目血量調整';
 const W = 960, H = 600;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -196,6 +199,7 @@ const hpNum = $('hp-num'), hpBar = $('hp-bar-inner');
 const timerTxt = $('timer-txt'), levelTxt = $('level-txt'), xpBar = $('xp-bar-inner');
 const suitNameEl = $('suit-name');
 const startOverlay = $('start-overlay'), levelupOverlay = $('levelup-overlay');
+$('version-tag').textContent = GAME_VERSION;
 const gameoverOverlay = $('gameover-overlay'), cardsEl = $('cards');
 const evoOverlay = $('evo-overlay'), evoEmoji = $('evo-emoji'), evoName = $('evo-name'), evoDesc = $('evo-desc');
 const flashEl = $('flash');
@@ -1119,20 +1123,20 @@ let enemies = [];
 let gems = [];
 let spawnTimer = 0;
 let elapsed = 0;
-const MAX_ENEMIES = 420;
+const MAX_ENEMIES = 600;
 
 const DIFFICULTY_POINTS = [
-  {t:0,   hp:1.0, dmg:1.0, spd:1.0, spawn:1.1},
-  {t:120, hp:1.3, dmg:1.0, spd:1.0, spawn:0.8},
-  {t:300, hp:2.0, dmg:1.15,spd:1.1, spawn:0.55},
-  {t:600, hp:3.2, dmg:1.3, spd:1.2, spawn:0.4},
-  {t:900, hp:5.0, dmg:1.5, spd:1.3, spawn:0.28},
-  {t:1200,hp:8.0, dmg:1.8, spd:1.4, spawn:0.2},
+  {t:0,   hp:1.0,  dmg:1.0,  spd:1.0,  spawn:1.0},
+  {t:120, hp:1.6,  dmg:1.05, spd:1.05, spawn:0.6},
+  {t:300, hp:2.8,  dmg:1.25, spd:1.15, spawn:0.4},
+  {t:600, hp:4.8,  dmg:1.5,  spd:1.25, spawn:0.26},
+  {t:900, hp:7.8,  dmg:1.75, spd:1.35, spawn:0.18},
+  {t:1200,hp:12.5, dmg:2.1,  spd:1.45, spawn:0.12},
 ];
 function getDifficulty(t){
   if(t>=1200){
     const extra=(t-1200)/60;
-    return { hp:8.0*Math.pow(1.15,extra), dmg:1.8*Math.pow(1.05,extra), spd:1.4, spawn:Math.max(0.16,0.2-extra*0.002) };
+    return { hp:12.5*Math.pow(1.18,extra), dmg:2.1*Math.pow(1.06,extra), spd:1.45, spawn:Math.max(0.1,0.12-extra*0.002) };
   }
   for(let i=0;i<DIFFICULTY_POINTS.length-1;i++){
     const a=DIFFICULTY_POINTS[i], b=DIFFICULTY_POINTS[i+1];
@@ -1170,7 +1174,7 @@ function spawnEnemy(){
   let r = rand(0,totalW); let chosen = pool[0];
   for(const id of pool){ r -= ENEMY_TYPES[id].weight; if(r<=0){ chosen=id; break; } }
   const type = ENEMY_TYPES[chosen];
-  const elite = t>900 && Math.random()<0.16;
+  const elite = t>480 && Math.random() < Math.min(0.32, 0.1 + (t-480)/2600);
 
   const edge = randInt(0,3); let x,y;
   if(edge===0){ x=rand(0,W); y=-20; } else if(edge===1){ x=W+20; y=rand(0,H); }
@@ -1198,8 +1202,8 @@ function updateEnemies(dt){
   spawnTimer -= dt;
   if(spawnTimer<=0 && enemies.length<MAX_ENEMIES){
     spawnTimer = diff.spawn;
-    const batch = 1 + Math.floor(elapsed/180);
-    for(let i=0;i<Math.min(batch,6) && enemies.length<MAX_ENEMIES;i++){ spawnEnemy(); }
+    const batch = 1 + Math.floor(elapsed/130);
+    for(let i=0;i<Math.min(batch,9) && enemies.length<MAX_ENEMIES;i++){ spawnEnemy(); }
   }
 
   for(const entry of BOSS_TABLE){
@@ -1489,7 +1493,7 @@ function showFinalBossAnnouncement(){
 function spawnFinalBoss(){
   const diff = getDifficulty(elapsed);
   enemies.push({
-    x: W/2, y: -80, typeId:'finalBoss', r:52, hp:16000*Math.max(1,diff.hp*0.5), maxHp:16000*Math.max(1,diff.hp*0.5),
+    x: W/2, y: -80, typeId:'finalBoss', r:52, hp:90000*Math.max(1,diff.hp*0.8), maxHp:90000*Math.max(1,diff.hp*0.8),
     speed:50, dmg:34, flyer:false, color:'#1e9628', phase:0, hitFlash:0, isBoss:true, isFinalBoss:true,
     bossName:'QUEEN METROID', speedMult:1, slowTimer:0, frozenTimer:0,
   });
