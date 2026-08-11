@@ -188,7 +188,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = 'v1.5.2 · 2026-08-11 · 修正跑步配色與站姿一致（四套動力服皆驗證）';
+const GAME_VERSION = 'v1.6 · 2026-08-11 · QUEEN戰重製（降臨/酸液/衝擊波/產卵）＋頭目死亡演出';
 const W = 960, H = 600;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -223,6 +223,28 @@ function mixWhite(hex, amt){
    每幀只做drawImage，600隻同屏也比舊的向量繪製快
 ========================================================= */
 const ENEMY_SPRITES = {
+  metroid:{ pal:{A:'#a5dbaf',B:'#3bc72e',C:'#00a906',D:'#69661a',E:'#006607',F:'#bd032e',G:'#51000e'}, rows:[
+    "........ACBBCBA.....",
+    "......CBBCEEECCCB...",
+    "....EACEEEEEEEEECAE.",
+    "...CACEEE......EECAC",
+    "..CBCAACEFFFFF.FEECC",
+    "..ACCAACFFFFFFFFFEEC",
+    ".BAECACFFGGFGGFF.EEC",
+    ".ACCEDFFGFFFFFGGFFEC",
+    ".ACEEFFFGGGFGGGFFDEC",
+    "BCCEEDFGFGGGGGFGFDFE",
+    "CBCEEDGFDGGGFGEFGDEE",
+    "BCCEEEEEDGGFGGDEEEEE",
+    "EACEECCCCEEFEECCCCCE",
+    ".ACCBAAAACEEECAAAABC",
+    ".AAABEECABCECCAEEDCA",
+    ".EABEF.GAAACAAAG.GEC",
+    "..ADAA..AAAAAAA..DAD",
+    "...DAD..GD...D...DAD",
+    "....DA.......G...AD.",
+    ".....DG.........GA..",
+  ]},
   zeela:{ pal:{A:'#cccc35',B:'#c8a000',C:'#768029',D:'#7a5804',E:'#384810',F:'#404000',G:'#283800'}, rows:[
     "...............DBD..",
     "..............D.ABD.",
@@ -1740,9 +1762,12 @@ function nearestEnemy(x,y){
 
 function damageEnemy(en, dmg){
   if(en.dead) return;
-  if(en.giant && en.entering) return; // 巨型頭目進場滑入中無敵，避免還沒登場就被秒殺
+  if(en.giant && (en.entering || en.dying)) return; // 巨型頭目進場中無敵；死亡演出中不再受擊
   en.hp -= dmg; en.hitFlash = 0.15;
-  if(en.hp<=0){ const idx = enemies.indexOf(en); if(idx>=0) killEnemy(idx); }
+  if(en.hp<=0){
+    if(en.giant){ en.hp = 0; en.dying = 1.6; return; } // 巨型頭目進入死亡演出（連環爆炸後才移除）
+    const idx = enemies.indexOf(en); if(idx>=0) killEnemy(idx);
+  }
 }
 
 function fireProjectileVolley(w, s){
@@ -2343,12 +2368,36 @@ function updateBossBattle(dt){
   const b = bossBattle;
   if(!b) return;
   if(!enemies.includes(b)){ bossBattle = null; return; } // 已被擊殺
+  // 死亡演出：連環爆炸＋震動＋淡出，結束後才真正移除（回饋：只是消失太突然）
+  if(b.dying){
+    b.dying -= dt;
+    b.deathFxT = (b.deathFxT||0) - dt;
+    if(b.deathFxT <= 0){
+      b.deathFxT = 0.13;
+      spawnBurst(b.x + rand(-b.wpx*0.3, b.wpx*0.3), b.y + rand(-b.hpx*0.35, b.hpx*0.35), '#ffe066', 14, 190, 0.5);
+      addBlastRing(b.x + rand(-b.wpx*0.25, b.wpx*0.25), b.y + rand(-b.hpx*0.3, b.hpx*0.3), rand(35, 75), '#ffbf50');
+    }
+    b.alpha = clamp(b.dying / 1.0, 0, 1); // 最後1秒淡出
+    b.shakeX = rand(-4, 4); b.shakeY = rand(-3, 3);
+    if(b.dying <= 0){
+      spawnBurst(b.x, b.y, '#ffffff', 60, 320, 0.9);
+      addBlastRing(b.x, b.y, Math.max(b.wpx, b.hpx)*0.7, '#ffffff');
+      const idx = enemies.indexOf(b);
+      if(idx >= 0) killEnemy(idx);
+    }
+    return;
+  }
   if(b.lungeT > 0) b.lungeT -= dt; // 攻擊前撲動作衰減
-  // 進場滑入（必須在凍結檢查之前：若凍結能中斷進場，冰凍光束會把頭目永久卡在場外造成軟鎖）
+  // 進場（必須在凍結檢查之前：若凍結能中斷進場，冰凍光束會把頭目永久卡在場外造成軟鎖）
+  // 支援任意方向：中頭目從側邊滑入、QUEEN 從頂部降下
   if(b.entering){
-    const dir = Math.sign(b.targetX - b.x);
-    b.x += dir * 170 * dt;
-    if((dir > 0 && b.x >= b.targetX) || (dir < 0 && b.x <= b.targetX)){ b.x = b.targetX; b.entering = false; }
+    const tx = (b.targetX !== undefined) ? b.targetX : b.x;
+    const ty = (b.targetY !== undefined) ? b.targetY : b.y;
+    const dx = tx - b.x, dy = ty - b.y;
+    const d = Math.hypot(dx, dy);
+    const step = 170 * dt;
+    if(d <= step){ b.x = tx; b.y = ty; b.entering = false; }
+    else { b.x += dx/d*step; b.y += dy/d*step; }
     return;
   }
   if(b.frozenTimer > 0) return; // 冰凍時暫停行動（獎勵冰系配置，giant有免疫冷卻防永凍）
@@ -2455,13 +2504,61 @@ function updateBossBattle(dt){
       }
       break;
     }
+    case 'QUEEN METROID': {
+      // 佔據畫面上方橫向游移；酸液扇射＋全場衝擊波＋產卵吸血Metroid幼體
+      b.x = b.baseX + Math.sin(b.patternT*0.5) * 95;
+      b.y = b.baseY + Math.sin(b.patternT*1.1) * 12;
+      if(b.attackTimer <= 0){
+        b.attackTimer = 2.4; b.lungeT = 0.25;
+        const base = Math.atan2(player.y - b.y, player.x - b.x);
+        for(let i=-2;i<=2;i++){
+          const ang = base + i*0.17;
+          fireEnemyProjectile({ type:'acid', x:b.x, y:b.y + b.hpx*0.25,
+            vx:Math.cos(ang)*235, vy:Math.sin(ang)*235, r:8, dmg:15, life:3.4, age:0, color:'#7fd820' });
+        }
+      }
+      b.shockTimer -= dt;
+      if(b.shockTimer <= 0){
+        b.shockTimer = 8.5;
+        fireEnemyProjectile({ type:'shock', x:b.x, y:b.y, radius:24, speed:240, maxRadius:1150,
+          dmg:20, life:6, age:0, color:'#a8f0b0', hitDone:false });
+      }
+      b.eggTimer = (b.eggTimer===undefined ? 4 : b.eggTimer) - dt;
+      if(b.eggTimer <= 0){
+        b.eggTimer = 6;
+        const alive = enemies.filter(e=>e.typeId==='metroid').length;
+        for(let i=0; i<2 && alive+i<6; i++){
+          spawnMetroid(b.x + rand(-70,70), b.y + b.hpx*0.32);
+        }
+      }
+      break;
+    }
   }
+}
+
+function spawnMetroid(x, y){
+  const diff = getDifficulty(elapsed);
+  enemies.push({ x, y, typeId:'metroid', r:15, hp:130*diff.hp, maxHp:130*diff.hp,
+    speed:140, dmg:12, flyer:true, drain:true, color:'#3adb4e',
+    phase:rand(0,7), hitFlash:0, speedMult:1, slowTimer:0, frozenTimer:0 });
+  spawnBurst(x, y, '#3adb4e', 12, 130, 0.4);
 }
 
 function updateEnemyProjectiles(dt){
   for(let i=enemyProjectiles.length-1; i>=0; i--){
     const p = enemyProjectiles[i];
     p.age += dt; p.life -= dt;
+    if(p.type === 'shock'){ // 擴張衝擊波：環通過玩家時判定一次傷害
+      p.radius += p.speed*dt;
+      if(p.life <= 0 || p.radius >= p.maxRadius){ enemyProjectiles.splice(i,1); continue; }
+      const d = Math.hypot(player.x - p.x, player.y - p.y);
+      if(!p.hitDone && Math.abs(d - p.radius) < 16 && player.invulTimer <= 0){
+        applyDamageToPlayer(p.dmg*(1-player.mods.suitDmgReduction));
+        player.invulTimer = 0.5; p.hitDone = true;
+        spawnBurst(player.x, player.y, '#ff5b5b', 10, 120, 0.35);
+      }
+      continue;
+    }
     if(p.gravity) p.vy += p.gravity*dt;
     p.x += p.vx*dt; p.y += p.vy*dt;
     if(p.life<=0 || p.x<-30 || p.x>W+30 || p.y<-60 || p.y>H+30){ enemyProjectiles.splice(i,1); continue; }
@@ -2493,6 +2590,18 @@ function drawEnemyProjectiles(){
       ctx.beginPath(); ctx.arc(0,0,p.r,0,Math.PI*2); ctx.fill();
       ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.8;
       ctx.beginPath(); ctx.arc(0,0,p.r*0.35,0,Math.PI*2); ctx.fill();
+    } else if(p.type==='acid'){
+      ctx.globalAlpha = 0.92;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(0,0,p.r*(1+Math.sin(p.age*14)*0.15),0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#d8ff85';
+      ctx.beginPath(); ctx.arc(0,-p.r*0.25,p.r*0.4,0,Math.PI*2); ctx.fill();
+    } else if(p.type==='shock'){
+      ctx.globalAlpha = clamp(p.life/6, 0.25, 0.8);
+      ctx.strokeStyle = p.color; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(0,0,p.radius,0,Math.PI*2); ctx.stroke();
+      ctx.lineWidth = 2; ctx.strokeStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(0,0,p.radius-4,0,Math.PI*2); ctx.stroke();
     } else { // fire
       const flick = 1 + Math.sin(p.age*22)*0.25;
       ctx.fillStyle = p.color;
@@ -2541,9 +2650,10 @@ function updateEnemies(dt){
       en.x += Math.cos(ang)*spd*dt; en.y += Math.sin(ang)*spd*dt;
     }
 
-    if(player.invulTimer<=0 && dist2(en.x,en.y,player.x,player.y) < (en.r+player.r)*(en.r+player.r)){
+    if(!en.dying && player.invulTimer<=0 && dist2(en.x,en.y,player.x,player.y) < (en.r+player.r)*(en.r+player.r)){
       const dmg = en.dmg*(1-player.mods.suitDmgReduction);
       applyDamageToPlayer(dmg);
+      if(en.drain){ en.hp = Math.min(en.maxHp, en.hp + dmg*2.5); } // Metroid幼體吸血回血
       player.invulTimer = 0.6;
       spawnBurst(player.x,player.y,'#ff5b5b',10,120,0.35);
     }
@@ -2607,11 +2717,16 @@ function drawEnemies(){
     const variant = flash ? 'f' : (warn ? 'w' : (en.elite ? 'e' : 'n'));
     const spr = sprKey ? getSpriteCanvas(sprKey, variant) : null;
     if(en.isFinalBoss){
+      if(en.alpha !== undefined && en.alpha < 1){ ctx.globalAlpha = en.alpha; }
+      ctx.translate(en.shakeX||0, en.shakeY||0);
+      ctx.scale(en.spriteScale||1, en.spriteScale||1);
       drawFinalBoss(ctx, 0, 0, elapsed, en.hitFlash);
+      ctx.globalAlpha = 1;
     } else if(spr && en.giant){
       // 巨型頭目：側邊錨定、依 faceRight 翻面（素材面向左；截斷側貼齊畫面外）
       // 動感：緩慢呼吸起伏（腳底錨定）＋攻擊瞬間朝戰場前撲
       if(en.alpha !== undefined && en.alpha < 1){ ctx.globalAlpha = en.alpha; }
+      ctx.translate(en.shakeX||0, en.shakeY||0);
       const gw = spr.width*en.spriteScale, gh = spr.height*en.spriteScale;
       const gBreathe = 1 + Math.sin(en.phase*0.45)*0.016;
       let lunge = 0;
@@ -2897,11 +3012,22 @@ function showMidBossAnnouncement(entry){
 }
 function spawnFinalBoss(){
   const diff = getDifficulty(elapsed);
-  enemies.push({
-    x: W/2, y: -80, typeId:'finalBoss', r:52, hp:90000*Math.max(1,diff.hp*0.8), maxHp:90000*Math.max(1,diff.hp*0.8),
-    speed:50, dmg:34, flyer:false, color:'#1e9628', phase:0, hitFlash:0, isBoss:true, isFinalBoss:true,
-    bossName:'QUEEN METROID', speedMult:1, slowTimer:0, frozenTimer:0,
-  });
+  const hp = 90000*Math.max(1, diff.hp*0.8);
+  if(!finalBossCache) buildFinalBossCache();
+  const scale = 2.1; // 皇后放大為原本的2.1倍，佔據畫面上方
+  const wpx = finalBossCache.w*scale, hpx = finalBossCache.h*scale;
+  const boss = {
+    x: W/2, y: -hpx*0.7, typeId:'finalBoss', giant:true, isBoss:true, isFinalBoss:true,
+    bossName:'QUEEN METROID', side:'top',
+    entering:true, targetX: W/2, targetY: hpx*0.42 + 10,
+    baseX: W/2, baseY: hpx*0.42 + 10,
+    spriteScale: scale, wpx, hpx, r: Math.min(wpx, hpx)*0.4,
+    hp, maxHp: hp, dmg: 34, speed: 0,
+    color:'#1e9628', phase:0, hitFlash:0, speedMult:1, slowTimer:0, frozenTimer:0,
+    attackTimer: 2.5, patternT: 0, shockTimer: 8, alpha: 1,
+  };
+  enemies.push(boss);
+  bossBattle = boss; // 皇后也走頭目戰系統：頂部血條、彈幕、死亡演出、雜兵停產
 }
 function triggerVictory(){
   state = 'victory';
