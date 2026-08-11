@@ -188,7 +188,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = 'v1.8.1 · 2026-08-11 · 彗星型彈幕＋鋸齒星芒命中閃光（參考圖風格）';
+const GAME_VERSION = 'v1.8.2 · 2026-08-11 · 彈幕放大＋抓鉤閃電鋸齒化與連鎖範圍強化';
 const W = 960, H = 600;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -1599,10 +1599,18 @@ function drawLightningFX(){
   for(const fx of lightningFX){
     ctx.save();
     ctx.globalAlpha = clamp(fx.life/fx.maxLife,0,1);
-    ctx.strokeStyle = fx.color; ctx.lineWidth = fx.evolved?4.5:2.5;
-    ctx.shadowColor = fx.color; ctx.shadowBlur = fx.evolved?14:8;
-    for(const seg of fx.segments){
-      ctx.beginPath(); ctx.moveTo(seg.from.x,seg.from.y); ctx.lineTo(seg.to.x,seg.to.y); ctx.stroke();
+    for(let si=0; si<fx.segments.length; si++){
+      const seg = fx.segments[si];
+      // 鋸齒閃電：兩個中繼點做垂直抖動，隨時間劈啪跳動
+      const dx = seg.to.x-seg.from.x, dy = seg.to.y-seg.from.y;
+      const len = Math.hypot(dx,dy)||1;
+      const px = -dy/len, py = dx/len;
+      const w1 = Math.sin(elapsed*42+si*2.1)*len*0.09, w2 = Math.sin(elapsed*38+si*3.7+2)*len*0.09;
+      const m1x = seg.from.x+dx*0.33+px*w1, m1y = seg.from.y+dy*0.33+py*w1;
+      const m2x = seg.from.x+dx*0.66+px*w2, m2y = seg.from.y+dy*0.66+py*w2;
+      ctx.beginPath(); ctx.moveTo(seg.from.x,seg.from.y); ctx.lineTo(m1x,m1y); ctx.lineTo(m2x,m2y); ctx.lineTo(seg.to.x,seg.to.y);
+      ctx.strokeStyle = fx.color; ctx.lineWidth = fx.evolved?5:3.5; ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.4; ctx.stroke();
     }
     ctx.restore();
   }
@@ -1653,7 +1661,7 @@ const WEAPON_DEFS = {
     evoPartner:'boosterCoil', evo:{ id:'shinesparkFury', name:'Shinespark Fury 閃光衝刺・狂', emoji:'✨', color:'#ffe9ff',
       desc:'能量光環大幅擴張，並定期爆發強力衝擊波。', dmgMult:1.8, radiusAdd:35, pulseBurst:true } },
   grappleBeam:{ name:'抓鉤光束', emoji:'⛓️', category:'chain', color:'#4fd8ff',
-    baseDmg:9, dmgPerLv:3.6, baseCd:0.6, cdPerLv:-0.02, chainCount:2, chainCountEvery:3, chainRange:150,
+    baseDmg:9, dmgPerLv:3.6, baseCd:0.6, cdPerLv:-0.02, chainCount:2, chainCountEvery:3, chainRange:200,
     evoPartner:'multiLockModule', evo:{ id:'chainLightningArray', name:'Chain Lightning Array 連鎖電網', emoji:'⚡', color:'#eaffff',
       desc:'連鎖跳數大幅提升，近乎連結全場敵人。', dmgMult:1.7, chainCountAdd:6 } },
   spiderMine:{ name:'磁力地雷', emoji:'🕸️', category:'mine', color:'#a3e635',
@@ -2041,7 +2049,7 @@ function fireChain(w, s){
     segs.push({from:{x:last.x,y:last.y}, to:{x:best.x,y:best.y}});
     excluded.add(best); last = {x:best.x,y:best.y};
   }
-  if(segs.length){ lightningFX.push({segments:segs, life:0.32, maxLife:0.32, color, evolved:w.evolved}); }
+  if(segs.length){ lightningFX.push({segments:segs, life:0.5, maxLife:0.5, color, evolved:w.evolved}); }
   if(w.evolved && def.evo.chainCountAdd){
     // Chain Lightning Array: persistent web feel - leaves a brief lingering glow at every node
     for(const seg of segs){ spawnBurst(seg.to.x, seg.to.y, '#eaffff', 3, 40, 0.5); }
@@ -2262,7 +2270,8 @@ function drawProjectiles(){
     } else {
       const shape = p.shape || 'bolt';
       if(shape==='bolt'){
-        // 參考圖彗星風：亮圓頭＋鋸齒漸細尾（尾緣隨時間顫動）
+        // 參考圖彗星風：亮圓頭＋鋸齒漸細尾（尾緣隨時間顫動）；放大1.4倍增加存在感
+        ctx.scale(1.4, 1.4);
         const j = Math.sin(p.age*28)*1.6;
         ctx.globalAlpha=0.35; ctx.fillStyle=col;
         ctx.beginPath(); ctx.moveTo(9,0);
