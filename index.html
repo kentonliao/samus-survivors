@@ -188,7 +188,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = 'v1.0 · 2026-08-10 · 全敵人像素圖重製（銀河戰士圖鑑取樣）';
+const GAME_VERSION = 'v1.1 · 2026-08-11 · 精英配色重製＋自爆警告＋終極頭目保底與效能修正';
 const W = 960, H = 600;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -539,9 +539,15 @@ const ENEMY_SPRITES = {
   ]},
 };
 const BOSS_SPRITE_KEY = { 'KRAID':'kraid', 'CROCOMIRE':'crocomire', 'PHANTOON':'phantoon', 'RIDLEY':'ridley' };
+function mixColor(hex, target, amt){
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  const tr=parseInt(target.slice(1,3),16), tg=parseInt(target.slice(3,5),16), tb=parseInt(target.slice(5,7),16);
+  return `rgb(${Math.round(r+(tr-r)*amt)},${Math.round(g+(tg-g)*amt)},${Math.round(b+(tb-b)*amt)})`;
+}
 const spriteCache = {};
-function getSpriteCanvas(key, flash){
-  const ck = key + (flash?'|f':'');
+// variant: 'n'=正常 / 'f'=受擊變白 / 'e'=精英（鍍金配色）/ 'w'=自爆警告（紅閃）
+function getSpriteCanvas(key, variant){
+  const ck = key + '|' + variant;
   if(spriteCache[ck]) return spriteCache[ck];
   const def = ENEMY_SPRITES[key];
   if(!def) return null;
@@ -554,7 +560,11 @@ function getSpriteCanvas(key, flash){
     for(let x=0;x<row.length;x++){
       const ch = row[x];
       if(ch === '.') continue;
-      c.fillStyle = flash ? mixWhite(def.pal[ch], 0.65) : def.pal[ch];
+      const col = def.pal[ch];
+      c.fillStyle = variant==='f' ? mixWhite(col, 0.65)
+                  : variant==='e' ? mixColor(col, '#ffd24a', 0.5)
+                  : variant==='w' ? mixColor(col, '#ff3020', 0.5)
+                  : col;
       c.fillRect(x,y,1,1);
     }
   }
@@ -677,39 +687,46 @@ const FINAL_BOSS_ROWS = [
   ".......KKK..K..KK.K...KK.......",
 ];
 const FINAL_BOSS_UNIT = 3.3;
-function drawFinalBoss(ctx, cx, cy, phase, hitFlash){
-  const rows = FINAL_BOSS_ROWS;
-  const u = FINAL_BOSS_UNIT;
+// 預渲染三層快取：base（非紅色像素）／rLayer（紅色像素，繪製時用globalAlpha做脈動）／flash（受擊變白版）
+// 舊版每幀逐像素fillRect約700次，是終極頭目登場時卡頓的原因
+let finalBossCache = null;
+function buildFinalBossCache(){
+  const rows = FINAL_BOSS_ROWS, u = FINAL_BOSS_UNIT;
   let maxW = 0; for(const r of rows) maxW = Math.max(maxW, r.length);
-  const w = maxW*u, h = rows.length*u;
-  const pulse = 0.75 + Math.sin(phase*3)*0.25;
-  const flashAmt = hitFlash>0 ? 0.55 : 0;
-  ctx.save();
-  ctx.translate(cx - w/2, cy - h/2);
+  const w = Math.ceil(maxW*u)+1, h = Math.ceil(rows.length*u)+1;
+  const mk = ()=>{ const cv=document.createElement('canvas'); cv.width=w; cv.height=h; return cv; };
+  const base = mk(), rLayer = mk(), flash = mk();
+  const bc = base.getContext('2d'), rc = rLayer.getContext('2d'), fc = flash.getContext('2d');
+  const COLORS = { K:[10,10,10], G:[30,150,40], R:[230,25,20], H:[242,242,242] };
   for(let r=0;r<rows.length;r++){
     const row = rows[r];
     for(let c=0;c<row.length;c++){
       const ch = row[c];
       if(ch==='.') continue;
-      let base;
-      switch(ch){
-        case 'K': base=[10,10,10]; break;
-        case 'G': base=[30,150,40]; break;
-        case 'R': base=[230,25,20]; break;
-        case 'H': base=[242,242,242]; break;
-        default: base=[255,255,255];
-      }
-      let color;
-      if(flashAmt>0){
-        color = `rgb(${Math.round(base[0]+(255-base[0])*flashAmt)},${Math.round(base[1]+(255-base[1])*flashAmt)},${Math.round(base[2]+(255-base[2])*flashAmt)})`;
-      } else if(ch==='R'){
-        color = `rgba(${base[0]},${base[1]},${base[2]},${pulse})`;
-      } else {
-        color = `rgb(${base[0]},${base[1]},${base[2]})`;
-      }
-      ctx.fillStyle = color;
-      ctx.fillRect(c*u, r*u, u+0.6, u+0.6);
+      const b = COLORS[ch] || [255,255,255];
+      const x = c*u, y = r*u, s = u+0.6;
+      const target = ch==='R' ? rc : bc;
+      target.fillStyle = `rgb(${b[0]},${b[1]},${b[2]})`;
+      target.fillRect(x, y, s, s);
+      fc.fillStyle = `rgb(${Math.round(b[0]+(255-b[0])*0.55)},${Math.round(b[1]+(255-b[1])*0.55)},${Math.round(b[2]+(255-b[2])*0.55)})`;
+      fc.fillRect(x, y, s, s);
     }
+  }
+  finalBossCache = { base, rLayer, flash, w, h };
+}
+function drawFinalBoss(ctx, cx, cy, phase, hitFlash){
+  if(!finalBossCache) buildFinalBossCache();
+  const fb = finalBossCache;
+  const pulse = 0.75 + Math.sin(phase*3)*0.25;
+  ctx.save();
+  ctx.translate(cx - fb.w/2, cy - fb.h/2);
+  if(hitFlash>0){
+    ctx.drawImage(fb.flash, 0, 0);
+  } else {
+    ctx.drawImage(fb.base, 0, 0);
+    ctx.globalAlpha = pulse;
+    ctx.drawImage(fb.rLayer, 0, 0);
+    ctx.globalAlpha = 1;
   }
   ctx.restore();
 }
@@ -1572,7 +1589,7 @@ function spawnEnemy(){
   if(edge===0){ x=rand(0,W); y=-20; } else if(edge===1){ x=W+20; y=rand(0,H); }
   else if(edge===2){ x=rand(0,W); y=H+20; } else { x=-20; y=rand(0,H); }
 
-  const hpMult = elite?2.2:1, dmgMult = elite?1.6:1, sizeMult = elite?1.35:1;
+  const hpMult = elite?2.2:1, dmgMult = elite?1.6:1, sizeMult = elite?1.2:1; // 精英改為鍍金配色+20%體型（取代金圈）
   enemies.push({
     x,y, typeId:chosen, r:type.r*sizeMult, hp:type.baseHp*diff.hp*hpMult, maxHp:type.baseHp*diff.hp*hpMult,
     speed:type.baseSpeed*diff.spd, dmg:type.baseDmg*diff.dmg*dmgMult, flyer:type.flyer, dash:type.dash,
@@ -1592,7 +1609,8 @@ function spawnBoss(entry){
 function updateEnemies(dt){
   const diff = getDifficulty(elapsed);
   spawnTimer -= dt;
-  if(spawnTimer<=0 && enemies.length<MAX_ENEMIES){
+  const finalBossActive = enemies.some(e=>e.isFinalBoss);
+  if(spawnTimer<=0 && enemies.length<MAX_ENEMIES && !finalBossActive){ // 終極頭目戰期間停止生產雜兵
     spawnTimer = diff.spawn;
     const batch = 1 + Math.floor(elapsed/130);
     for(let i=0;i<Math.min(batch,9) && enemies.length<MAX_ENEMIES;i++){ spawnEnemy(); }
@@ -1678,7 +1696,9 @@ function drawEnemies(){
     ctx.save(); ctx.translate(en.x,en.y);
     if(en.frozenTimer>0){ ctx.filter='brightness(1.6) saturate(0.3)'; }
     const sprKey = en.isFinalBoss ? null : (en.isBoss ? BOSS_SPRITE_KEY[en.bossName] : en.typeId);
-    const spr = sprKey ? getSpriteCanvas(sprKey, flash) : null;
+    const warn = en.explodeOnDeath && Math.sin(en.phase*2.5) > 0.55; // 自爆蟲週期性紅閃警告
+    const variant = flash ? 'f' : (warn ? 'w' : (en.elite ? 'e' : 'n'));
+    const spr = sprKey ? getSpriteCanvas(sprKey, variant) : null;
     if(en.isFinalBoss){
       drawFinalBoss(ctx, 0, 0, elapsed, en.hitFlash);
     } else if(spr){
@@ -1713,7 +1733,6 @@ function drawEnemies(){
       for(let i=-1;i<=1;i+=2){ ctx.fillRect(i*8-2, bob+en.r*0.5, 4, 6+Math.sin(en.phase*2)*2); }
       ctx.fillStyle = '#ff2e2e'; ctx.fillRect(-4,bob-4,3,3); ctx.fillRect(2,bob-4,3,3);
     }
-    if(en.elite && !en.isBoss){ ctx.strokeStyle='#ffe066'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,en.r+3,0,Math.PI*2); ctx.stroke(); }
     ctx.restore();
 
     if(en.hp < en.maxHp){
@@ -2048,6 +2067,9 @@ function update(dt){
   updateParticles(dt);
 
   if(player.hp<=0){ endGame(); return; }
+  // 保底機制：進化搭配選錯導致永遠湊不滿6把進化時，25分鐘強制觸發終極頭目
+  if(!player.finalBossTriggered && elapsed>=1500){ player.finalBossTriggered=true; pendingFinalBoss=true; }
+  if(pendingFinalBoss && state==='playing'){ pendingFinalBoss=false; showFinalBossAnnouncement(); return; }
   if(levelUpQueue>0 && state==='playing'){ openLevelUp(); }
 }
 
