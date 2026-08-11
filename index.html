@@ -188,7 +188,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = 'v1.6 · 2026-08-11 · QUEEN戰重製（降臨/酸液/衝擊波/產卵）＋頭目死亡演出';
+const GAME_VERSION = 'v1.7 · 2026-08-11 · 背景美化（俯視角地形）＋頭目血量成長曲線';
 const W = 960, H = 600;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -1447,39 +1447,100 @@ function drawFinalBoss(ctx, cx, cy, phase, hitFlash){
 /* =========================================================
    背景
 ========================================================= */
-const stars = [];
-for(let i=0;i<70;i++){ stars.push({x:rand(0,W), y:rand(0,H*0.6), r:rand(0.5,1.6), tw:rand(0,Math.PI*2)}); }
-const rocks = [];
-for(let i=0;i<18;i++){ rocks.push({x:rand(20,W-20), y:rand(H*0.55,H-20), s:rand(6,18)}); }
-
-function drawBackground(t, playerX, playerY){
-  const g = ctx.createLinearGradient(0,0,0,H);
-  g.addColorStop(0,'#0b1120'); g.addColorStop(0.55,'#141b2e'); g.addColorStop(1,'#1c1310');
-  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
-  for(const s of stars){
-    const a = 0.4 + Math.sin(t*1.5+s.tw)*0.3;
-    ctx.fillStyle = `rgba(150,210,255,${clamp(a,0,1)})`;
-    ctx.fillRect(s.x, s.y, s.r*2, s.r*2);
+/* 俯視角地形背景（參考使用者提供的場景圖：深藍綠岩石地面＋苔蘚＋水晶）
+   整張預渲染成離屏canvas，每幀只做1次drawImage＋少量水晶脈動光，效能極低成本 */
+let bgCanvas = null;
+let bgGlows = []; // 會脈動發光的點（水晶/孢子）
+function buildBackground(){
+  bgCanvas = document.createElement('canvas'); bgCanvas.width = W; bgCanvas.height = H;
+  const c = bgCanvas.getContext('2d');
+  bgGlows = [];
+  // 底色
+  const g = c.createLinearGradient(0,0,W,H);
+  g.addColorStop(0,'#0c2530'); g.addColorStop(0.5,'#0a1f2a'); g.addColorStop(1,'#0d2836');
+  c.fillStyle = g; c.fillRect(0,0,W,H);
+  // 鵝卵石地面：抖動網格上的橢圓石塊，色調微變
+  const PEB = ['#10303e','#0e2b38','#123544','#0f2e3c','#143a4a','#0d2937'];
+  for(let gy=0; gy<H+8; gy+=7){
+    for(let gx=0; gx<W+8; gx+=8){
+      const jx = gx + rand(-2,2), jy = gy + rand(-2,2);
+      c.fillStyle = PEB[randInt(0,PEB.length-1)];
+      c.beginPath(); c.ellipse(jx, jy, rand(3.2,4.6), rand(2.6,3.6), rand(0,3), 0, Math.PI*2); c.fill();
+    }
   }
-  const px = (playerX - W/2)*0.02;
-  ctx.fillStyle = '#161a2c';
-  ctx.beginPath(); ctx.moveTo(-50-px, H*0.62);
-  for(let x=-50;x<=W+50;x+=80){ ctx.lineTo(x-px, H*0.62 - Math.sin(x*0.02)*40 - 30); }
-  ctx.lineTo(W+50-px, H); ctx.lineTo(-50-px, H); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#20140f';
-  ctx.beginPath(); ctx.moveTo(-50-px*1.6, H*0.72);
-  for(let x=-50;x<=W+50;x+=60){ ctx.lineTo(x-px*1.6, H*0.72 - Math.cos(x*0.03)*22 - 12); }
-  ctx.lineTo(W+50-px*1.6, H); ctx.lineTo(-50-px*1.6, H); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = 'rgba(79,216,255,0.08)'; ctx.lineWidth = 1;
-  const gridSize = 40;
-  const offX = (playerX*0.15) % gridSize, offY = (playerY*0.15) % gridSize;
-  for(let x=-offX; x<W; x+=gridSize){ ctx.beginPath(); ctx.moveTo(x, H*0.62); ctx.lineTo(x, H); ctx.stroke(); }
-  for(let y=H*0.62-offY; y<H; y+=gridSize){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
-  ctx.fillStyle = '#0d0805';
-  for(const r of rocks){ ctx.beginPath(); ctx.ellipse(r.x, r.y, r.s, r.s*0.55, 0, 0, Math.PI*2); ctx.fill(); }
-  const vg = ctx.createRadialGradient(W/2,H/2,H*0.35,W/2,H/2,H*0.85);
-  vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,0.55)');
-  ctx.fillStyle = vg; ctx.fillRect(0,0,W,H);
+  // 大塊岩板區（更深色的區塊增加地形起伏感）
+  for(let i=0;i<9;i++){
+    const x = rand(0,W), y = rand(0,H), rr = rand(50,130);
+    c.fillStyle = 'rgba(6,18,26,0.35)';
+    c.beginPath();
+    for(let a=0;a<Math.PI*2;a+=0.5){ const d = rr*rand(0.7,1.15); const px=x+Math.cos(a)*d, py=y+Math.sin(a)*d; a===0?c.moveTo(px,py):c.lineTo(px,py); }
+    c.closePath(); c.fill();
+  }
+  // 苔蘚斑塊：隨機遊走的綠色小點群
+  const MOSS = ['#1c4a2c','#245c36','#2c6b3f','#1a4227'];
+  for(let i=0;i<26;i++){
+    let mx = rand(20,W-20), my = rand(20,H-20);
+    const n = randInt(24,70);
+    for(let j=0;j<n;j++){
+      c.fillStyle = MOSS[randInt(0,MOSS.length-1)];
+      c.beginPath(); c.ellipse(mx, my, rand(2,4.5), rand(1.6,3.4), 0, 0, Math.PI*2); c.fill();
+      mx += rand(-7,7); my += rand(-6,6);
+      if(Math.random()<0.12){ c.fillStyle = '#3f8a50'; c.fillRect(mx, my, 2, 2); } // 亮點
+    }
+  }
+  // 綠水晶簇（發光裝飾，記錄位置給每幀脈動）
+  for(let i=0;i<11;i++){
+    const x = rand(30,W-30), y = rand(30,H-30);
+    const s = rand(7,15);
+    for(let k=0;k<randInt(2,4);k++){
+      const ox = rand(-s*0.7,s*0.7), oh = s*rand(0.8,1.5);
+      c.fillStyle = '#3fa08c';
+      c.beginPath(); c.moveTo(x+ox, y); c.lineTo(x+ox-s*0.28, y); c.lineTo(x+ox-s*0.1, y-oh); c.closePath(); c.fill();
+      c.fillStyle = '#9fe8d8';
+      c.beginPath(); c.moveTo(x+ox, y); c.lineTo(x+ox-s*0.12, y-oh*0.9); c.lineTo(x+ox+s*0.1, y-oh*0.55); c.closePath(); c.fill();
+    }
+    c.fillStyle = 'rgba(10,26,24,0.5)';
+    c.beginPath(); c.ellipse(x, y+2, s*1.1, s*0.35, 0, 0, Math.PI*2); c.fill();
+    bgGlows.push({x, y: y-s*0.6, r: s*1.4, ph: rand(0,7), color:'rgba(140,240,215,'});
+  }
+  // 灰岩塊
+  for(let i=0;i<14;i++){
+    const x = rand(20,W-20), y = rand(20,H-20), s = rand(5,11);
+    c.fillStyle = '#3d4d55';
+    c.beginPath();
+    c.moveTo(x-s,y+s*0.4); c.lineTo(x-s*0.5,y-s*0.6); c.lineTo(x+s*0.4,y-s*0.8); c.lineTo(x+s,y+s*0.3); c.lineTo(x+s*0.3,y+s*0.7); c.closePath(); c.fill();
+    c.fillStyle = '#54666f'; c.fillRect(x-s*0.3, y-s*0.5, s*0.6, s*0.4);
+  }
+  // 小草叢
+  for(let i=0;i<20;i++){
+    const x = rand(15,W-15), y = rand(15,H-15);
+    c.strokeStyle = '#1c4527'; c.lineWidth = 2;
+    for(let b=0;b<4;b++){
+      c.beginPath(); c.moveTo(x+b*3-4, y);
+      c.quadraticCurveTo(x+b*3-4+rand(-2,2), y-6, x+b*3-4+rand(-4,4), y-rand(8,13));
+      c.stroke();
+    }
+  }
+  // 紅色孢子點（參考圖的粉紅色光點）
+  for(let i=0;i<16;i++){
+    const x = rand(10,W-10), y = rand(10,H-10);
+    c.fillStyle = '#c94a68';
+    c.beginPath(); c.arc(x, y, rand(1.5,2.5), 0, Math.PI*2); c.fill();
+    if(Math.random()<0.5) bgGlows.push({x, y, r: 5, ph: rand(0,7), color:'rgba(230,110,140,'});
+  }
+  // 暗角
+  const vg = c.createRadialGradient(W/2,H/2,H*0.38,W/2,H/2,H*0.9);
+  vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,0.5)');
+  c.fillStyle = vg; c.fillRect(0,0,W,H);
+}
+function drawBackground(t, playerX, playerY){
+  if(!bgCanvas) buildBackground();
+  ctx.drawImage(bgCanvas, 0, 0);
+  for(const gl of bgGlows){ // 微弱脈動光，只提示「這裡會發光」而不是圓盤
+    const a = 0.07 + Math.sin(t*1.6 + gl.ph)*0.05;
+    ctx.fillStyle = gl.color + clamp(a,0.02,0.13) + ')';
+    ctx.beginPath(); ctx.arc(gl.x, gl.y, gl.r*0.9, 0, Math.PI*2); ctx.fill();
+  }
 }
 
 /* =========================================================
@@ -2332,6 +2393,10 @@ function startBossBattle(entry){
   const key = BOSS_SPRITE_KEY[entry.name];
   const spr = getSpriteCanvas(key, 'n');
   const side = Math.random() < 0.5 ? 'left' : 'right';
+  // 血量隨時間難度超線性放大：玩家中後期有進化武器，固定血量會讓第2隻起越打越輕鬆
+  // （回饋：「從第2隻開始反而比第一隻好打」）。5分鐘Kraid為基準×1，之後依 diff.hp^1.6 放大
+  const hpScale = Math.pow(Math.max(1, getDifficulty(elapsed).hp / 2.8), 1.6);
+  const bossHp = Math.round(entry.hp * hpScale);
   const targetH = H * entry.heightFrac;
   const scale = targetH / spr.height;
   const wpx = spr.width * scale;
@@ -2345,7 +2410,7 @@ function startBossBattle(entry){
     spriteScale: scale, wpx, hpx: targetH,
     faceRight: side === 'left',
     r: Math.min(wpx, targetH) * 0.38,
-    hp: entry.hp, maxHp: entry.hp, dmg: entry.dmg, speed: 0,
+    hp: bossHp, maxHp: bossHp, dmg: entry.dmg, speed: 0,
     color: entry.color, phase: 0, hitFlash: 0, speedMult: 1, slowTimer: 0, frozenTimer: 0,
     attackTimer: 2.2, patternT: 0, rockTimer: 3.5, tpTimer: 6, alpha: 1,
     dashTimer: 6, dashPhase: null, dashY: 0, dashVX: 0,
@@ -3012,7 +3077,8 @@ function showMidBossAnnouncement(entry){
 }
 function spawnFinalBoss(){
   const diff = getDifficulty(elapsed);
-  const hp = 90000*Math.max(1, diff.hp*0.8);
+  // ×6：全進化陣容DPS極高，原公式下皇后兩輪酸液就被融化（回饋確認）
+  const hp = 90000*Math.max(1, diff.hp*0.8)*6;
   if(!finalBossCache) buildFinalBossCache();
   const scale = 2.1; // 皇后放大為原本的2.1倍，佔據畫面上方
   const wpx = finalBossCache.w*scale, hpx = finalBossCache.h*scale;
