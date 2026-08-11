@@ -188,7 +188,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = 'v1.2 · 2026-08-11 · 薩姆斯造型重製（圖鑑取樣，動力服變色保留）';
+const GAME_VERSION = 'v1.3 · 2026-08-11 · 巨型頭目戰：半屏頭目＋專屬攻擊模式＋敵方彈幕';
 const W = 960, H = 600;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -1063,6 +1063,7 @@ function nearestEnemy(x,y){
 
 function damageEnemy(en, dmg){
   if(en.dead) return;
+  if(en.giant && en.entering) return; // 巨型頭目進場滑入中無敵，避免還沒登場就被秒殺
   en.hp -= dmg; en.hitFlash = 0.15;
   if(en.hp<=0){ const idx = enemies.indexOf(en); if(idx>=0) killEnemy(idx); }
 }
@@ -1581,12 +1582,15 @@ const ENEMY_TYPES = {
   rinka:{ introduceAt:600, baseHp:20, baseDmg:10, baseSpeed:145, r:9,  weight:1.3, flyer:true, color:'#ff8a3d' },
 };
 const BOSS_TABLE = [
-  {t:300,  name:'KRAID',     color:'#ff6a1a', hp:1400, dmg:26, speed:45},
-  {t:600,  name:'CROCOMIRE', color:'#ff9b3d', hp:2600, dmg:22, speed:60},
-  {t:900,  name:'PHANTOON',  color:'#9b59d0', hp:4200, dmg:30, speed:55},
-  {t:1200, name:'RIDLEY',    color:'#c0272c', hp:7000, dmg:38, speed:75},
+  {t:300,  name:'KRAID',     color:'#ff6a1a', hp:5000,  dmg:26, heightFrac:0.70, grounded:true},
+  {t:600,  name:'CROCOMIRE', color:'#ff9b3d', hp:9000,  dmg:22, heightFrac:0.48, grounded:true},
+  {t:900,  name:'PHANTOON',  color:'#9b59d0', hp:14000, dmg:30, heightFrac:0.60, grounded:false},
+  {t:1200, name:'RIDLEY',    color:'#c0272c', hp:22000, dmg:38, heightFrac:0.44, grounded:false},
 ];
 let bossSpawned = {};
+let bossBattle = null;      // 進行中的巨型頭目戰（指向該頭目物件）
+let enemyProjectiles = [];  // 敵方彈幕
+const MAX_ENEMY_PROJECTILES = 90;
 
 function spawnEnemy(){
   const t = elapsed;
@@ -1612,26 +1616,230 @@ function spawnEnemy(){
   });
 }
 
-function spawnBoss(entry){
-  enemies.push({
-    x: W/2, y: -60, typeId:'boss', r:34, hp:entry.hp, maxHp:entry.hp, speed:entry.speed, dmg:entry.dmg,
-    flyer:false, color:entry.color, phase:0, hitFlash:0, isBoss:true, bossName:entry.name, speedMult:1, slowTimer:0, frozenTimer:0,
-  });
-  const banner = document.createElement('div');
+/* =========================================================
+   巨型頭目戰：頭目佔滿畫面一側，從側邊滑入，專屬攻擊模式，
+   戰鬥期間停止生產雜兵。素材的截斷側（如Kraid尾巴）永遠貼齊
+   畫面邊緣之外，畫面上看不到斷面。
+========================================================= */
+function startBossBattle(entry){
+  const key = BOSS_SPRITE_KEY[entry.name];
+  const spr = getSpriteCanvas(key, 'n');
+  const side = Math.random() < 0.5 ? 'left' : 'right';
+  const targetH = H * entry.heightFrac;
+  const scale = targetH / spr.height;
+  const wpx = spr.width * scale;
+  // 素材皆面向左、截斷側在右：右側登場不翻面，左側登場水平翻面，截斷側都朝畫面外
+  const anchorX = side === 'right' ? W - wpx/2 + wpx*0.06 : wpx/2 - wpx*0.06;
+  const baseY = entry.grounded ? H - 18 - targetH/2 : H*0.42;
+  const boss = {
+    typeId:'boss', isBoss:true, giant:true, bossName:entry.name, side,
+    x: side === 'right' ? W + wpx*0.7 : -wpx*0.7, y: baseY, baseY,
+    targetX: anchorX, entering: true,
+    spriteScale: scale, wpx, hpx: targetH,
+    faceRight: side === 'left',
+    r: Math.min(wpx, targetH) * 0.38,
+    hp: entry.hp, maxHp: entry.hp, dmg: entry.dmg, speed: 0,
+    color: entry.color, phase: 0, hitFlash: 0, speedMult: 1, slowTimer: 0, frozenTimer: 0,
+    attackTimer: 2.2, patternT: 0, rockTimer: 3.5, tpTimer: 6, alpha: 1,
+    dashTimer: 6, dashPhase: null, dashY: 0, dashVX: 0,
+  };
+  enemies.push(boss);
+  bossBattle = boss;
+  suitBanner.textContent = '⚠ ' + entry.name + ' 來襲！';
+  suitBanner.classList.add('show');
+  setTimeout(()=>{ suitBanner.classList.remove('show'); }, 1800);
+}
+
+function fireEnemyProjectile(p){
+  if(enemyProjectiles.length >= MAX_ENEMY_PROJECTILES){ enemyProjectiles.shift(); }
+  enemyProjectiles.push(p);
+}
+
+function bossAimAtPlayer(b, spread){
+  const ang = Math.atan2(player.y - b.y, player.x - b.x) + rand(-spread, spread);
+  return ang;
+}
+
+function updateBossBattle(dt){
+  const b = bossBattle;
+  if(!b) return;
+  if(!enemies.includes(b)){ bossBattle = null; return; } // 已被擊殺
+  if(b.frozenTimer > 0) return; // 冰凍時暫停行動（獎勵冰系配置）
+  // 進場滑入
+  if(b.entering){
+    const dir = Math.sign(b.targetX - b.x);
+    b.x += dir * 170 * dt;
+    if((dir > 0 && b.x >= b.targetX) || (dir < 0 && b.x <= b.targetX)){ b.x = b.targetX; b.entering = false; }
+    return;
+  }
+  b.patternT += dt;
+  b.attackTimer -= dt;
+  const fireDir = b.faceRight ? 1 : -1;
+  switch(b.bossName){
+    case 'KRAID': {
+      // 腹部三連尖刺 + 頭頂落石
+      if(b.attackTimer <= 0){
+        b.attackTimer = 2.3;
+        for(let i=0;i<3;i++){
+          const ang = bossAimAtPlayer(b, 0.14) ;
+          fireEnemyProjectile({ type:'spike', x:b.x + fireDir*b.wpx*0.22, y:b.y - b.hpx*0.18 + i*b.hpx*0.16,
+            vx:Math.cos(ang)*250, vy:Math.sin(ang)*250, r:7, dmg:14, life:3, age:0, color:'#e8e3b0' });
+        }
+      }
+      b.rockTimer -= dt;
+      if(b.rockTimer <= 0){
+        b.rockTimer = 3.6;
+        for(let i=0;i<3;i++){
+          fireEnemyProjectile({ type:'rock', x:rand(40, W-40), y:-16 - i*30, vx:rand(-15,15), vy:50,
+            gravity:330, r:9, dmg:16, life:4, age:0, color:'#a8825a' });
+        }
+      }
+      break;
+    }
+    case 'CROCOMIRE': {
+      // 沿側邊上下移動 + 扇形火彈
+      b.y = b.baseY + Math.sin(b.patternT*0.85) * H*0.2;
+      if(b.attackTimer <= 0){
+        b.attackTimer = 2.7;
+        const base = bossAimAtPlayer(b, 0);
+        for(let i=-2;i<=2;i++){
+          const ang = base + i*0.24;
+          fireEnemyProjectile({ type:'fire', x:b.x + fireDir*b.wpx*0.3, y:b.y - b.hpx*0.08,
+            vx:Math.cos(ang)*210, vy:Math.sin(ang)*210, r:7, dmg:12, life:3.2, age:0, color:'#ff8a2a' });
+        }
+      }
+      break;
+    }
+    case 'PHANTOON': {
+      // 瞬移換邊（淡出淡入）+ 環形幽靈火球
+      b.y = b.baseY + Math.sin(b.patternT*1.3) * 26;
+      b.tpTimer -= dt;
+      if(b.tpTimer <= -0.8){ // 淡入完成
+        b.tpTimer = 6; b.alpha = 1;
+      } else if(b.tpTimer <= 0){
+        if(b.alpha > 0.95){ // 瞬移時刻：換邊
+          b.side = b.side === 'right' ? 'left' : 'right';
+          b.faceRight = b.side === 'left';
+          b.x = b.side === 'right' ? W - b.wpx/2 + b.wpx*0.06 : b.wpx/2 - b.wpx*0.06;
+        }
+        b.alpha = Math.min(1, 0.25 + (-b.tpTimer)/0.8*0.75); // 淡入
+      } else if(b.tpTimer <= 0.7){
+        b.alpha = Math.max(0.25, b.tpTimer/0.7); // 淡出
+      }
+      if(b.attackTimer <= 0 && b.alpha > 0.9){
+        b.attackTimer = 3.1;
+        const n = 10;
+        for(let i=0;i<n;i++){
+          const ang = (Math.PI*2/n)*i + b.patternT;
+          fireEnemyProjectile({ type:'ghost', x:b.x + fireDir*b.wpx*0.1, y:b.y,
+            vx:Math.cos(ang)*140, vy:Math.sin(ang)*140, r:7, dmg:10, life:4, age:0, color:'#c07df0' });
+        }
+      }
+      break;
+    }
+    case 'RIDLEY': {
+      // 平時側邊盤旋吐火球；定期鎖定玩家高度俯衝橫掃全場，衝到對側重新錨定
+      if(b.dashPhase === 'telegraph'){
+        b.dashT -= dt;
+        b.y += (b.dashY - b.y) * Math.min(1, dt*6);
+        if(b.dashT <= 0){
+          b.dashPhase = 'dash';
+          b.dashVX = (b.side === 'right' ? -1 : 1) * 720;
+          b.faceRight = b.dashVX > 0;
+        }
+      } else if(b.dashPhase === 'dash'){
+        b.x += b.dashVX * dt;
+        const out = b.dashVX > 0 ? b.x > W + b.wpx*0.6 : b.x < -b.wpx*0.6;
+        if(out){ // 衝出畫面，換邊重新進場
+          b.side = b.dashVX > 0 ? 'right' : 'left';
+          b.faceRight = b.side === 'left';
+          b.targetX = b.side === 'right' ? W - b.wpx/2 + b.wpx*0.06 : b.wpx/2 - b.wpx*0.06;
+          b.x = b.side === 'right' ? W + b.wpx*0.7 : -b.wpx*0.7;
+          b.y = b.baseY; b.dashPhase = null; b.entering = true; b.dashTimer = 7;
+        }
+      } else {
+        b.y = b.baseY + Math.sin(b.patternT*1.1) * 30;
+        b.dashTimer -= dt;
+        if(b.dashTimer <= 0){
+          b.dashPhase = 'telegraph'; b.dashT = 0.8; b.dashY = player.y;
+          spawnBurst(b.x, b.y, '#ff4040', 20, 180, 0.5);
+        }
+        if(b.attackTimer <= 0){
+          b.attackTimer = 2.4;
+          for(let i=0;i<2;i++){
+            const ang = bossAimAtPlayer(b, 0.1);
+            fireEnemyProjectile({ type:'fire', x:b.x + fireDir*b.wpx*0.28, y:b.y - b.hpx*0.2,
+              vx:Math.cos(ang)*265, vy:Math.sin(ang)*265, r:8, dmg:16, life:3, age:0, color:'#ff5030' });
+          }
+        }
+      }
+      break;
+    }
+  }
+}
+
+function updateEnemyProjectiles(dt){
+  for(let i=enemyProjectiles.length-1; i>=0; i--){
+    const p = enemyProjectiles[i];
+    p.age += dt; p.life -= dt;
+    if(p.gravity) p.vy += p.gravity*dt;
+    p.x += p.vx*dt; p.y += p.vy*dt;
+    if(p.life<=0 || p.x<-30 || p.x>W+30 || p.y<-60 || p.y>H+30){ enemyProjectiles.splice(i,1); continue; }
+    if(player.invulTimer<=0 && dist2(p.x,p.y,player.x,player.y) < (p.r+player.r)*(p.r+player.r)){
+      applyDamageToPlayer(p.dmg*(1-player.mods.suitDmgReduction));
+      player.invulTimer = 0.5;
+      spawnBurst(player.x,player.y,'#ff5b5b',10,120,0.35);
+      enemyProjectiles.splice(i,1);
+    }
+  }
+}
+
+function drawEnemyProjectiles(){
+  for(const p of enemyProjectiles){
+    ctx.save();
+    ctx.translate(p.x,p.y);
+    if(p.type==='spike'){
+      ctx.rotate(Math.atan2(p.vy,p.vx));
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.moveTo(10,0); ctx.lineTo(-7,-4); ctx.lineTo(-7,4); ctx.closePath(); ctx.fill();
+    } else if(p.type==='rock'){
+      ctx.rotate(p.age*3);
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.moveTo(-p.r,-p.r*0.5); ctx.lineTo(0,-p.r); ctx.lineTo(p.r,-p.r*0.4); ctx.lineTo(p.r*0.8,p.r*0.7); ctx.lineTo(-p.r*0.6,p.r); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(-p.r*0.4,-p.r*0.3,p.r*0.7,p.r*0.5);
+    } else if(p.type==='ghost'){
+      ctx.globalAlpha = 0.75 + Math.sin(p.age*10)*0.2;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(0,0,p.r,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.globalAlpha = 0.8;
+      ctx.beginPath(); ctx.arc(0,0,p.r*0.35,0,Math.PI*2); ctx.fill();
+    } else { // fire
+      const flick = 1 + Math.sin(p.age*22)*0.25;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(0,0,p.r*flick,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#ffe27a';
+      ctx.beginPath(); ctx.arc(0,0,p.r*0.45*flick,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
 }
 
 function updateEnemies(dt){
   const diff = getDifficulty(elapsed);
   spawnTimer -= dt;
   const finalBossActive = enemies.some(e=>e.isFinalBoss);
-  if(spawnTimer<=0 && enemies.length<MAX_ENEMIES && !finalBossActive){ // 終極頭目戰期間停止生產雜兵
+  if(spawnTimer<=0 && enemies.length<MAX_ENEMIES && !finalBossActive && !bossBattle){ // 頭目戰期間停止生產雜兵
     spawnTimer = diff.spawn;
     const batch = 1 + Math.floor(elapsed/130);
     for(let i=0;i<Math.min(batch,9) && enemies.length<MAX_ENEMIES;i++){ spawnEnemy(); }
   }
 
   for(const entry of BOSS_TABLE){
-    if(elapsed>=entry.t && !bossSpawned[entry.t]){ bossSpawned[entry.t]=true; spawnBoss(entry); }
+    // 前一場頭目戰未結束時延後下一場（理論上間隔5分鐘不會撞，保險起見）
+    if(elapsed>=entry.t && !bossSpawned[entry.t] && !bossBattle && !finalBossActive){
+      bossSpawned[entry.t]=true; startBossBattle(entry);
+    }
   }
 
   for(let idx=enemies.length-1; idx>=0; idx--){
@@ -1640,15 +1848,17 @@ function updateEnemies(dt){
     if(en.hitFlash>0) en.hitFlash -= dt;
     if(en.slowTimer>0){ en.slowTimer-=dt; if(en.slowTimer<=0) en.speedMult=1; }
     if(en.frozenTimer>0){ en.frozenTimer-=dt; continue; }
-    let tx=player.x, ty=player.y;
-    if(en.flyer){ tx += Math.sin(en.phase)*30; ty += Math.cos(en.phase*0.7)*20; }
-    let spd = en.speed*(en.speedMult||1);
-    if(en.dash){
-      en.dashTimer -= dt;
-      if(en.dashTimer<=0){ spd*=2.6; if(en.dashTimer<-0.25){ en.dashTimer = rand(1.5,3); } }
+    if(!en.giant){ // 巨型頭目的移動由 updateBossBattle 控制，不追玩家
+      let tx=player.x, ty=player.y;
+      if(en.flyer){ tx += Math.sin(en.phase)*30; ty += Math.cos(en.phase*0.7)*20; }
+      let spd = en.speed*(en.speedMult||1);
+      if(en.dash){
+        en.dashTimer -= dt;
+        if(en.dashTimer<=0){ spd*=2.6; if(en.dashTimer<-0.25){ en.dashTimer = rand(1.5,3); } }
+      }
+      const ang = Math.atan2(ty-en.y, tx-en.x);
+      en.x += Math.cos(ang)*spd*dt; en.y += Math.sin(ang)*spd*dt;
     }
-    const ang = Math.atan2(ty-en.y, tx-en.x);
-    en.x += Math.cos(ang)*spd*dt; en.y += Math.sin(ang)*spd*dt;
 
     if(player.invulTimer<=0 && dist2(en.x,en.y,player.x,player.y) < (en.r+player.r)*(en.r+player.r)){
       const dmg = en.dmg*(1-player.mods.suitDmgReduction);
@@ -1677,6 +1887,7 @@ function killEnemy(index){
   if(en.dead) return;
   en.dead = true;
   enemies.splice(index,1); // 必須先移除：自爆等死亡效果若再傷到彼此，會無限遞迴（相鄰自爆蟲互殺爆栈）
+  if(en === bossBattle){ bossBattle = null; enemyProjectiles.length = 0; } // 頭目戰結束：清彈幕、恢復生產
   spawnBurst(en.x,en.y, en.isBoss?'#ffe066':(en.flyer ? '#c58bff' : '#ffd76a'), en.isBoss?60:10, en.isBoss?260:140, en.isBoss?0.9:0.4);
   if(en.isFinalBoss){
     spawnBurst(en.x,en.y,'#1e9628',80,300,1.2);
@@ -1692,7 +1903,8 @@ function killEnemy(index){
   if(en.isBoss){
     const gemCount = 14;
     for(let i=0;i<gemCount;i++){
-      gems.push({x:en.x+rand(-20,20), y:en.y+rand(-20,20), vx:0, vy:0, value:Math.ceil(gemVal/gemCount), r:7, phase:rand(0,7)});
+      // 巨型頭目中心可能貼近畫面邊緣，結晶位置夾回場內
+      gems.push({x:clamp(en.x+rand(-40,40), 30, W-30), y:clamp(en.y+rand(-40,40), 30, H-30), vx:0, vy:0, value:Math.ceil(gemVal/gemCount), r:7, phase:rand(0,7)});
     }
   } else if(gems.length >= GEM_CONSOLIDATE_CAP){
     const consolidator = gems.find(g=>g.consolidator);
@@ -1715,6 +1927,14 @@ function drawEnemies(){
     const spr = sprKey ? getSpriteCanvas(sprKey, variant) : null;
     if(en.isFinalBoss){
       drawFinalBoss(ctx, 0, 0, elapsed, en.hitFlash);
+    } else if(spr && en.giant){
+      // 巨型頭目：側邊錨定、依 faceRight 翻面（素材面向左；截斷側貼齊畫面外）
+      if(en.alpha !== undefined && en.alpha < 1){ ctx.globalAlpha = en.alpha; }
+      if(en.faceRight){ ctx.scale(-1,1); }
+      ctx.imageSmoothingEnabled = false;
+      const gw = spr.width*en.spriteScale, gh = spr.height*en.spriteScale;
+      ctx.drawImage(spr, -gw/2, -gh/2, gw, gh);
+      ctx.globalAlpha = 1;
     } else if(spr){
       // 像素圖繪製：素材面向左，玩家在右側時水平翻面；走地型加上下擺動
       // 寬高分別擬合：寬扁素材（如Ripper）不會因寬度而被整體縮小
@@ -1749,16 +1969,28 @@ function drawEnemies(){
     }
     ctx.restore();
 
-    if(en.hp < en.maxHp){
+    if(en.hp < en.maxHp && !en.giant){
       const bw = en.isFinalBoss ? 110 : (en.isBoss ? 60 : en.r*2);
       ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(en.x-bw/2, en.y-en.r-14, bw, en.isBoss?6:3);
       ctx.fillStyle = en.isFinalBoss?'#1e9628':(en.isBoss?'#ffe066':'#ff5b3d');
       ctx.fillRect(en.x-bw/2, en.y-en.r-14, bw*clamp(en.hp/en.maxHp,0,1), en.isBoss?6:3);
     }
-    if(en.isBoss){
+    if(en.isBoss && !en.giant){
       ctx.save(); ctx.font=(en.isFinalBoss?"12px":"10px")+" 'Press Start 2P'"; ctx.fillStyle=en.isFinalBoss?'#1e9628':'#ffe066'; ctx.textAlign='center';
       ctx.fillText(en.bossName, en.x, en.y-en.r-22); ctx.restore();
     }
+  }
+  // 巨型頭目：畫面頂部大血條＋名稱
+  if(bossBattle && enemies.includes(bossBattle)){
+    const b = bossBattle;
+    const bw = 380, bx = W/2 - bw/2, by = 26;
+    ctx.save();
+    ctx.font = "11px 'Press Start 2P'"; ctx.fillStyle = '#ffe066'; ctx.textAlign = 'center';
+    ctx.fillText(b.bossName, W/2, by-6);
+    ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(bx-2, by-2, bw+4, 14);
+    ctx.fillStyle = '#5a1010'; ctx.fillRect(bx, by, bw, 10);
+    ctx.fillStyle = '#ffe066'; ctx.fillRect(bx, by, bw*clamp(b.hp/b.maxHp,0,1), 10);
+    ctx.restore();
   }
 }
 
@@ -2019,6 +2251,7 @@ function resetGame(){
   player.suitTier='power'; player.invulTimer=0; player.reserveCharges=0; player.finalBossTriggered=false;
   enemies=[]; gems=[]; projectiles=[]; particles=[]; bombs=[]; novas=[]; mines=[]; pulses=[]; lightningFX=[]; blastRings=[];
   spawnTimer=0.6; elapsed=0; levelUpQueue=0; evolutionQueue=[]; pendingFinalBoss=false; bossSpawned={};
+  bossBattle=null; enemyProjectiles=[];
 }
 
 function startGame(){
@@ -2077,13 +2310,16 @@ function update(dt){
   updateLightningFX(dt);
   updateBlastRings(dt);
   updateEnemies(dt);
+  updateBossBattle(dt);
+  updateEnemyProjectiles(dt);
   updateGems(dt);
   updateParticles(dt);
 
   if(player.hp<=0){ endGame(); return; }
   // 保底機制：進化搭配選錯導致永遠湊不滿6把進化時，25分鐘強制觸發終極頭目
   if(!player.finalBossTriggered && elapsed>=1500){ player.finalBossTriggered=true; pendingFinalBoss=true; }
-  if(pendingFinalBoss && state==='playing'){ pendingFinalBoss=false; showFinalBossAnnouncement(); return; }
+  // 中頭目戰進行中先不放終極頭目（打完才觸發）
+  if(pendingFinalBoss && state==='playing' && !bossBattle){ pendingFinalBoss=false; showFinalBossAnnouncement(); return; }
   if(levelUpQueue>0 && state==='playing'){ openLevelUp(); }
 }
 
@@ -2097,6 +2333,7 @@ function draw(){
   drawNovas();
   drawPulses();
   drawEnemies();
+  drawEnemyProjectiles();
   drawProjectiles();
   drawContinuousBeams();
   drawLightningFX();
