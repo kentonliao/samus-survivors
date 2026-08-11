@@ -188,7 +188,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = 'v1.3 · 2026-08-11 · 巨型頭目戰：半屏頭目＋專屬攻擊模式＋敵方彈幕';
+const GAME_VERSION = 'v1.4 · 2026-08-11 · 頭目高解析重繪＋血量大增＋威脅偵測公告＋頭目連戰';
 const W = 960, H = 600;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -365,177 +365,447 @@ const ENEMY_SPRITES = {
     "...FFECBDFF...",
     ".....GFFF.....",
   ]},
-  kraid:{ pal:{A:'#f8e090',B:'#b8c878',C:'#63a35f',D:'#408048',E:'#306838',F:'#2a4820',G:'#2b2e11'}, rows:[
-    "...................DDDBED...............",
-    "..................DDDDEDEDD.............",
-    "................DDEEEDEEEEDDD...........",
-    "...............DEDEEDEDGFEEFED..........",
-    "...............CDEDEFDD.GFEFFF..........",
-    "..............DGGEEEFDDDDD.GGG..........",
-    "............B.EGCDEEFDDD................",
-    "............DFDCCCBCDDDDD...............",
-    "............BCCFGBADEDDEDF..............",
-    ".............GGGBADDDEFFFGG.............",
-    ".............GCBBBBCEDEFG.GG............",
-    "............BABCAAABDCDEFGGG............",
-    "CEEE........BBBAAAABCEEFFGG.............",
-    "...DF.......CBAAAAACEDFF................",
-    "..DDDEED...CAAAAAABCDDDFG...............",
-    ".EFEEFFEFDBAAAAABBCDDDDEFEFF............",
-    "C.....FFFEEAAAAABCDEEEFF.EG.............",
-    ".......FFFFFDDAABCDEGDEFE.G.............",
-    ".......DBEGGGFEDECCDDDEF.EGG............",
-    ".......CBBABGGGFFEDDFEE..FGF............",
-    "........CCCCBBEGGGFFDGG.FFF.............",
-    ".......DBBBBCCCBCGGFEEFG................",
-    "......DCBAAAACDDDDDFFEFFFG..............",
-    "......DBAAAAABCDEFFGFFFDFFF.............",
-    "......BBAAAAAABDDEEFFFDEGF..............",
-    ".....DCBAAAAAABCDDEFFGEFF.G.............",
-    ".....DDBAAAAAABCDDEEFGEGFF..............",
-    ".....CBBAAAAAABCDDEEFGFG..G.............",
-    "....CAAAAAAAAABCDDDEFFGGFGFG............",
-    "...CBAAAAAAAAABDDDEEFGDEFG.G............",
-    "...CAAAAAAAAABBDDEEFFFEFEFG.............",
-    "..DBAAAAAAAABDDDDDEFFGFFGGG.............",
-    ".DDBAAAAAAABCDCDDEFEFGF.F...............",
-    "..CAAAAAAAACDEEFDDEEFFF.FFF.............",
-    "..CAAAAAAACDDCDEEFFEFGEDDFGF............",
-    ".DDBAAAAABDEEDFEEEGFG.EEFGF.............",
-    ".DDAAAAAACDDEDEEFGFGFGEEGGF.............",
-    ".CAAAAAABEDEEFFGEFFGG.GFEF..............",
-    ".CAAAAAACDDEFFGDFGG.FFFG.F..............",
-    ".CAAAAABDEEDFEFFGGEFFGGG.FFG............",
-    ".CAAAAADEDDEFFFGGFEFGG..EEGG............",
-    ".CAAAAACDDEEFFGEFFGGG.GGEDFGF...........",
-    ".CAAAAADEFFGFFGEFGGFGGG.FFGFG...........",
-    ".DCAAAADFFEGGF.FF.FGGG.G.EF.............",
-    ".CCAAAADFEE.FGFGGGFGG.F..G....G.GG.GG.GG",
-    "..BBAAABDDEFDDFG.GGGGEGGGGGGGGGGGGGGGGGG",
-    "..BBAAABDDDFDDGGGGGFFFGGGFGGGGGGGGGGGGGG",
-    "..CCAAABDDEDECGGGGGFFEFFDFFFFFFFFFFFFFFF",
-    "..DCBBBCCDDEEDFGGGGGFGEDDDDEEEEEEEEEEEEE",
-    "....CCCCDDDEDDDGGGGGGFEDDDDDDDDDDDDDDDDD",
-    "....DDDDDDEEDCDDEGGGGGFFEDDDCDDCDDCDDCDD",
-    "..DEDDDEEFEEDDBBDFGGFFEEEFDEDDDDDDDDDDED",
-    ".BCACEEFFEFFECCCDEFEE.....EFEFFEFFEFFEFF",
-    "CDBDEEDDDDDDEEDDE.......................",
+  kraid:{ pal:{A:'#f8f8f8',B:'#f8e0a8',C:'#f8e090',D:'#b8c878',E:'#80b068',F:'#499858',G:'#408048',H:'#9f606d',I:'#306838',J:'#284820',K:'#7c0425',L:'#283010'}, rows:[
+    "..............................................CF....................................................",
+    "..............................................CD.......E............................................",
+    "..............................................CEF...D.DEDC..........................................",
+    "..............................................DCF..DELFFC...FD......................................",
+    "..............................................CCF.FIFE.CCJIGGI......................................",
+    "..............................................IDGJFGJGFCEIJFGGJFEFDF................................",
+    ".............................................FJIGEFGJICEIGGEEILJFFGI................................",
+    "..........................................GFFGGGIGGGGEEIIEIIJIGGGGGJG.FD............................",
+    ".........................................GGIGGIIIIIGGGILIIIIIGIGGJGJFFGG............................",
+    "........................................FGGFGIIJIIIIEFIIIFILJIIIIGGG.GGFF...........................",
+    ".......................................GFJDFIIIIEIGJEGGGFILJJIIIIIIIJJGGGF..........................",
+    "......................................EGILFFFGILIEGGIJGGF.LJJJIIIJIJJGIGGIF.........................",
+    ".....................................DDDJIGIJIIFIGGEGIEFI.LJLJLIJIJJLIJIIGI.........................",
+    "....................................DEEEDJIILFFIIJJIFGGGF..LL.LJLJLLGJJJJJJ.........................",
+    "....................................DEKKKDIILEFIIIJJFFEGFI....IIFIFFGLJJJJL.........................",
+    "....................................HHKKKEDIJJFGIJJJ.EFGGIGEGGGEGG..JLLJLLL.........................",
+    "...................................JKKEKKKDEJJFGIJJL.GJIEGGGJIII.....LLLLL..........................",
+    "..............................D....EICHKKK.EJLIIJJL.IDFGFGGGEF.....J.LLLLL..........................",
+    "..............................CL...GJEKKKFEEIJGFJIJLEFGGJGGG.......L....I...........................",
+    "..............................CF.EGGJJFEFEFIIJLFFGIJEGGJGE.....LLLIL..LL............................",
+    "..............................EEEI.JJLGEEGFIDDDDEFGFEJEI.LLJ....I.ILLI..............................",
+    ".............................GIGJLLFFFIEDEDEEDCDDEJFGEGFEEFGIE......................................",
+    ".............................EGGEEEEDDEDEI.IALDCEFGGGIFIFFGIJFFFF...................................",
+    ".............................EDDDEDEGGJKBK..DCCDFIILIFGIFFIJFGGJL...................................",
+    "..............................FGFGFIKKKKKKEDCCDFFIJJEGIFGGGIJIIJLL..................................",
+    "...............................KKKA.KKKK..DCCDFFGIJJFGGGIIIJJJI.JLL.................................",
+    "...............................K.K..KKKAEDCCDEFFGGIFGIILJJLLJJJJLLLL................................",
+    "...............................K.K.KHKKFDCCDDDDEEFGGGLJLLLLL.LL.L.JLL...............................",
+    "...............................K.KKKKFDCCDDFDDDEEFFIIFGGJIJJLL....LLL...............................",
+    "................................AKKCDCCDDEDDDCFDEEEJEIGGIIJJLJJLILLLL...............................",
+    "..............................FFDEFECCFFDCCCCCDDDEGJEEFEEFIJJJLJ.L.LL...............................",
+    "...II.........................EDCCCCDFIDDCCCCCCEEDEJEEEFGIIIFJJJLL.LL...............................",
+    ".DDFGIIJ......................ECCCCDFDCCCCCCCCCCDDEEDFIGGJFIIIJJLL.LL...............................",
+    "FDFJIIGGL.....................EDDDDFDDCCCCCCCCCDCEEDEGIIIIFIIJ..JLL.................................",
+    "F..JJJIGIL....................EEEEGDCCCCCCCCCCCEDEEDIIEJJJLJJJ..LL...L..............................",
+    "......GIGIJ...................LFEFECCCCCCCCCCCCCDEFJIJJJJLJJLL..LL..................................",
+    "........JGJIGE...............FEDCCCCCCCCCCCCCCCDEEFLFFFFIJLLL..I....J.J.............................",
+    "........JJIGFIGJ............FEDCCCCCCCCCCCCCDDFDEEFDDIFGIIJ..III......I.............................",
+    ".....L..JIIFEJGIIE.........FEDCCCCCCCCCCCCCCCDDDEEFJDFGJIJJ.LL.....LL.L.............................",
+    "...JJIGGFFGGGIJJJEIGF.....FDDDCCCCCCCCCCCCCDDEDEEFGGIFEFGEI.LJ.I.JJLL...............................",
+    "..IIGIIIGGIIIIIJJGIJGI..FEDCCCCCCCCCCCCCCDDDDDEFGFGGFGFGGGIJJ..LI.L.JJ..............................",
+    ".GFGIILLLLJIJJJJIIGIII.JEECCCCCCCCCCCCCCCDDDEEFEFGGDFIGGGIJLJJ..I.JJJJ..............................",
+    ".IJJJ......LJLLLIIJLLLJGJGFCCCCCCCCCCCCCDDDEDEFFGIIGFIIIGJJ.L..GI.LII...............................",
+    "IDJJ..........ILJJIIILJIGJGICCCCCCCCCCCDDDDDEFFFIIJIFJJJJJJ.L..G.LL.I...............................",
+    "DE..............IJJJIJJIGIGLJFGFCCCCCCCCDDEEFFGIIJJLIFI.LLL...GILL..................................",
+    ".D................LJLLJIIJLJLJIFFFCCCCCDDDDEEFFGIJJLDFGGIJ..IIG.LL..................................",
+    "...................FIJLJIIIJIILFFFJCCCCCCDDDDFEFIIJLIFIIIJJLIG..LLLLJ...............................",
+    "...................FEDLLLJJLJLLIIGIJJJDFIIDEEEEFFIIJJDIIJJJ....IJJLJL...............................",
+    "..................FEDDDIIL.JLLLJJIGGIFFGJIIEDDEEGFFJDEFIIJJ...GGILL.LJ..............................",
+    "..................FEDDDDCCLJLLLLJJJJGIIJELLFEEEEEIDDFGGFIJJLI..G.IL.LJ..............................",
+    "..................FDDEDCCCCJLLL.LLLJJJIEFIJFDIGEDDIJGJGGII.LI.GJJLLLL...............................",
+    "..................FEEDDDDDCCCCILLLLLLJJ.LJLLLJEJFJ.LJII.IJ..I.JJJL.JJ...............................",
+    "...................EEDDEDDDDDDDCDILLLLLL...JLJIGLI..LJIJJL..I.LJLLJJ................................",
+    "...................IFFFFFEFEFEEDCDDEILLLII.JJIJIIIGI.LLLL..I.JJJJJJ.................................",
+    "....................FEDEEDDDEFFDDDDDDCILLLLLLJJLJJGGGI....IJ.J....I.................................",
+    ".................GGFDDDDDDDDDDEFEDDDDDDDILLLJJ.JL.JIIIGIILLI..IL....................................",
+    "................GFEEDDCCDDDDDDDDFEEEDEDDEDI.LLLIIJJIIIJJJ.LIJL.I....................................",
+    "................GDDEDDCCCCCDCCCDEGFFEEEEEEEEFL.LLJIIIIIJJ.LIJLIL..I.................................",
+    "................GFFFDCCCCCCCCCCDDEEGFFFGEEGEEFGF..JJJIIJJJLJJJILJ...................................",
+    "................GCDCCCCCCCCCCCCCCDEEGFFGFFIGGIGIIJ.J.JJ.J.I..L..LL..................................",
+    "................GDCCCCCCCCCCCCCCCDDEEGIIIIIJJJIJJII.J..LLIG.JJJJJJJ.................................",
+    "................GDECCCCCCCCCCCCCCDDDEEGGJJJLJLJLLLLJI..JIGGGLJJJLL..................................",
+    "................DCEDCCCCCCCCCCCCCCDDDFFFGGGIIJJIJJJJGIIIGGIILJJJ...J................................",
+    "...............GDDDDCCCCCCCCCCCCCCCDDEEFIIGIIIJJJJLJLL.GIIILLL.J...L................................",
+    "...............GFGDDCCCCCCCCCCCCCCCDDEEEEIFGGGIGIJJJL.FFIIIJLLII.JLJ................................",
+    "..............GDGDEDCCCCCCCCCCCCCDCDEEFEEIJGILGIJJJL..IFIJJLLJLL.LLL................................",
+    ".............GGDEEDCCCCCCCCCCCCCCCDDDEEEGFFFGJJIIJJJLLIGJJJIIJ....J.................................",
+    ".............GFGEGDDCCCCCCCCCCCCCCDDDDEEGGFGGIJIIJJJLLLFIILLLI.LLLI.................................",
+    "..............IGFDDDCCCCCCCCCCCCCCDDDDFEFFFGIIIJLJLJJLL.IILLLJIJII..................................",
+    ".............FEEEDCCCCCCCCCCCCCCCCCDDDEGGFGGGGIJGJJJJJL.ILII.....L..................................",
+    "............FEEDDDDDCCCCCCCCCCCCCDCDDDEEIEGGGIJEIIIJJJJ.JLL..J...L..................................",
+    "...........EEEDDCDCDDCDCCCCCCCCCCCDDDEEGJGFGILEIIIIJLJLIJLLLL.J..LLJ................................",
+    "..........EEDDCCCCCCCCCCCCCCCCCCCCCCDDEIEFFGGGGIIJIJJJJIJLL...J.IJJLL...............................",
+    ".........FEDDCCCCCCCCCCCCCCCCCCCCCCCDDEEEFGFGGGGJIJJJJJLILLLGILIIJ..L...............................",
+    ".........FEDCCCCCCCCCCCCCCCCCCCCCCCDDDEEFFFGGGJLILLLJJLLLLGGIJLLLIJ.LJ..............................",
+    "........FEDECCCCCCCCCCCCCCCCCCCCCCCCCDGFFFFGGIJFGJJJLLLLFFIIJJJLLI..LJ..............................",
+    "........EDDCCCCCCCCCCCCCCCCCCCCCCCCCDEGIGIIIIGGIIJJLJLLGFFIIJJJLJJ..L...............................",
+    ".......FEDCCCCCCCCCCCCCCCCCCCCCCCCCCDFGFFFIGGGIIJJLJLLFGIGFFIILLJ..LJ...............................",
+    ".......FEDCCCCCCCCCCCCCCCCCCCCCCCDDDDIEGGIIJIIJLLLJJJLFGIJLFIII.JJLJI...............................",
+    "......FEDCCCCCCCCCCCCCCCCCCCCCCCCDFGEIIEEEEIGGIIIJJJJJFGIJJJJLLL.JJI................................",
+    "......FEDCCCCCCCCCCCCCCCCCCCCCCCDFGGJJFEEEFFGIGIJJJJLLEGJJFLLLLJJILJ................................",
+    "....GGGGDCCCCCCCCCCCCCCCCCCCCCCDFGDEFIGFFFGGGIIJJJJJLLJFJLLJLJIILJ..................................",
+    "...IEEGGDCCCCCCCCCCCCCCCCCCCCDEELFEEEEGFGGGGIJJIJJJJLLL.JLLLJL...JLJ................................",
+    "....IIGDGCCCCCCCCCCCCCCCCCCCDDEEIIFEGEGGGIIIIJJJGIIJLLLIJJ..JLLL..LI................................",
+    "....GFICDCCCCCCCCCCCCCCCCCCDDDEFEIFGGIIIGGFFFGJGGJJJJL.JJL..IJLLL.LI................................",
+    "....GEIDFCCCCCCCCCCCCCCCCCCEDEEFGIGGIIJIEEFGGGIIGJJJIJFJLL...IJJJLJL................................",
+    "....GEDCDCCCCCCCCCCCCCCCCCDEEFFGIIGIJJJEFFGIIIJJJILLIJFJLLL..LLGIIJL.L..............................",
+    "....FEFDDCCCCCCCCCCCCCCCCDEDEFGIGEEEGIIFGGIJJJJIIIJJJLJIJ.L.JGIIJL..LL..............................",
+    "....GEDDECCCCCCCCCCCCCCCDEEEFGIGEEGGGGJIGIIJIJJIIJJJLL..IJ.FFFIJJJL.JL..............................",
+    "....GDGCECCCCCCCCCCCCCCDDFIEGIJGEGIIIIJJIIIIIJJJIIJLLLL..GGGIGGIJLLJ.J..............................",
+    "...IGFGEDCCCCCCCCCCCCCCDDFFFIIEEIIIJJLGEFIIIILLJJJJLL..JGIIFJJJLGJJJ.J..............................",
+    "...EEFCFDCCCCCCCCCCCCCCEDFFIGEFFIEEEFJFJIIIJJLJLLG.LL...EIFIIJJLLFJJ.J..............................",
+    "..GEEIDECCCCCCCCCCCCCCEDEFIEEFIIEFFGGIGIIIIJLLGJLLGJJJL.EEIIJJLLJGJ.J...............................",
+    "..FEGGGDDCCCCCCCCCCCCDEDGIDEGGIFFGIIIJIIIIJJLLIJLIJLLLL.FEGIJJLJIIJJ................................",
+    "...IGEEDCCCCCCCCCCCCCDDFIDEFGIIFIIIJJJLLLLLLLLIJLJLLLL..IIGJLLIILJI.................................",
+    "...EEDCCCCCCCCCCCCCCDDJIIEFGIJGFIJJJJJ.L.JJII.IJJLLL....LIIJLIJJJ...................................",
+    "..IEDDCCCCCCCCCCCCCCDGEIEFGGIJGIJJJJL..GGIIIJIL.LLL....JJL.JIIIIJ.J.................................",
+    "..FEDCCCCCCCCCCCCCCCEDEIFFGIJIIJJJJLLLGIIJJLLLLL.LL...IIJLL....J....................................",
+    "..FEDDCCCCCCCCCCCCCEDEEIIGIIIEIJJJLL.LGIJJLLLLL..LJILL.ILLL...JJ....................................",
+    "..EDDCCCCCCCCCCCCCDDDEEIJGIJEFGJJLLJIGGJJLLLL.L.GIIIJJ..JLL...JL...II...............................",
+    "..EEDCCCCCCCCCCCCCDDEEGGJGIEFGIJJIIIJJGJJLLLL..IIIJJJLL.JLLL...J.IIIL...............................",
+    "..EEDCCCCCCCCCCCCDDDFFGIIJIEGIJJJFIJJJIJLLLL..IGIJJJLLLL.JJ.....IIJLLLI.............................",
+    "..EEDCCCCCCCCCCCCDDFFFGIIJEFIIJJJIJJJJLJJLJ..IGJJJLLLLL.......IIIJL.LJ.I............................",
+    "..EEDCCCCCCCCCCCCDJIIIIEEIEFIJJJIIJJLJLLLLLJJJIJJJLLLL..JL...IFGIJ...L.L............................",
+    "..EEDDCCCCCCCCCCCDDEEJFEGLEFIIJJIJJLLLL.GJIJL.JJJLLLL...JLLLLIGGIL.LLLJG............................",
+    "..EEDDCCCCCCCCCCCDDEFIEGGIGGIIJJJJJLLL.GGIJ....JJLLL..LJJLLLLGFGI.ILLL.G............................",
+    "..FEDDCCCCCCCCCCCDDFFIGGGIGGIIJJJIJJL.LIIJJJLL..LL....LLJ...LIIGGJILL.JI............................",
+    "..FEDCCCCCCCCCCCCFEGGIGIILJ.IIJJJIJLLLGGIJJLLLL.LJJLLIJL....LJFGJILLJJJJ............................",
+    "..IEDDCCCCCCCCCCCEIIIIJLJJJJLLLGGJJJL.GJJJLLL..LJJLLLLLLL..LLIIJL.GJ.G..L...........................",
+    "...EDDCCCCCCCCCCCDIJIJLJJJIJLJJJJJJL..JIJJLL..LJJJLLLLL.L.JLLIIJL.L.G..L..L.........................",
+    "...GGGDDDCCCCCCCCDFJJJJLJIJJL.LLJJJL.LLIIJ...JJJLLLLLL..L.JL..IIIJJJ.........JJJ.....JJJ....JJJ....J",
+    "..IGGEGDCCCCCCCCCDGJJGGIGGI...LJJLL.IIJJ....LJJJLLLJJJ....JL......................L.................",
+    "..GFGEEDCCCCCCCCCEFGJGFIIGI...JIILLLIJJJJJLLLJLLLLLJL...........L..........LLL..LLLLL..LLLLLLLLLLLLL",
+    "...GDGDECCCCCCCCCDEGJJIIJEIL.LLIGLLIJJLLLLLLJJLLLLLLL.LLJJL....LL...L......LLLLLLLLLLLLLLLLLLLLLLLLL",
+    "....DFGGDCCCCCCCCCDFGJIFIJGIJJIIGJLIJLLLL..JJJLLLLLL.LII....J.LL.LL.................................",
+    "....GDDDDCCCCCCCCDDFGIJGFIJIJIIGGGJIJLLLL.LJILLLLLLJLIIJL.LLLLL.LLLLLLLLLLLLLLLLLLL.LLLLLLLLLLLLLLLL",
+    ".....DCDCCCCCCCCCCDFFFGIFGILJGEFFGLIJLL...LLLLLLIJLIGIJJ.LLLJL.LJLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL",
+    ".....GCFDDCCCCCCCDDDFGGLGGIJLIGFEELLLLLLLLLLLLLJJLIIGIJLLLLJJLLJLJLLLJLL.JLLJL..JJLLJ..LJLLJLLLJLLJL",
+    ".....GDDCDCCCCCCCCDDEFGGIGGJLIIFEELLLLLLLLLLLLLJLIIJLLJLILLJLLJJJLJJLLLLLLLLL.LLLLLLLLLLLLLLLLLLLLLL",
+    ".....GDCCCCCCCCCCCDDDFFGIGGIGGIIFDILLLLLLLLLLLJJJJJLIGGGILJLLJJJLLJJJJLJJ.JJJLJJLJJJLJJLJJJLLJLLJJJL",
+    ".....GEFEDCCCCCCCDFFFFFIGIJIGFEIGEFLLLLLLLLLLLJJJLLIIGIIJJJLGIGILLJJJJJJJLJJJJJJJJJJJJJJJJJJJJJJJJJJ",
+    ".....GDDEEDCCCCDDDDDEFFGGIIIGGEIGEDILLLLLLLLLLLLLJJJIIJLJIGGGGIGIIIJJJIJIJJJJJIJJJJJJIJIJJJJIJIJJJJI",
+    ".....GFEECDDDDDDDDFEEEGEFFGGIGFIGFDELLLLLLLLLLLLLJJJJLLJIGGGGGGIIGGIIJIIIJIIJIIIJJIIJIIIJIIJIIIJIIJI",
+    "......FGFCDDDDDDDEEEEEFFFIGGIIFIGEEDJLLLLLLLLLLLLJJJLLJIIGGGFFGJFGGIGIIIIIIGIIIIIIGIIIIIIGIIIIIIIGII",
+    ".........EEDEEEDDDEEEGEFFGGILJIEFFFFF.LLLLLLLLLLLLLLLJJIIIGGGFEFFFFGGGGGGIGGIGGGGGGGGGGGGGGIGGGIGGGG",
+    ".........FEDEEEEEEEEEEFFFGGIIJIFFEEDEELLLLLLLLLLLLLLJJJIIIGGGFEFEFEFJGGIGFJJGFIGFGJGFGIGGJJGGIGGJJGG",
+    "..........FFEEEEFFFFFFFFFFIGGGFFFFFFGIILLLLLLLLLLLLLLLJJIIIGGGFFEEEFJFGGFGFJFGFGGFJFGFGGFJFFGGGFFJFG",
+    "...........FFFFFFFFFGFFFGGIGIIGFFGFFEEIJILLLLLLLLLLLLLLJJIIIGGGFFEEEFFFFEFFFFFEFFFFFFEFFFFFFFFFFFFFF",
+    "...........EFFFEFEFFFGIEEGJIIIIIFEEDGFFIFGLLLLLJLLLLLLLLLLJJIIGGFFFEFEEEEEFFEEEEEEFFEEEEEFFEEEEEFFEE",
+    ".....JGGIJLGFJEEFGIIJFGGIGIJIIJFFEEGEEFGEFILLLLLJLLLLLJJJJJJJJJJIGFFGFEEEEFGFEEEEFGFEEEEFGGFEEEFGGFE",
+    "....JFFGIJLLIIFFIJFIJFFJIFIGIJIFFGGEDEDDEEILLLLJJJLJJJJJIIIIIIJJJGFGIFFFFFGJFFFFFGJGFFFFFJGFFFFFGJFF",
+    "...JCEIFJFFFGGIJDFIIJ.JIGGIJIJIGGGEDDDDDEFIJLJLJLJLJJIIII.EFGFIIJJIILGGGGGILIGGGGILIGGGGILIGGGGGILIG",
+    "..JCCDIJFCCFGIJIGFIJJ.IIIJIJGJGGIEDEDDDDEEGJJJLIJJJIIII........FGIJJLIIGIIJLJIGGIJLJIGGIILJIIGIIJLII",
+    "..DDEFJCCCDEIIIIIJLLL.IJJJJLIJIIJEEEEEEEEFIIIIIJIIIII............FFFIJJJJJJIJJJJJJIJJJJJJIJJJJJJJIJJ",
+    ".CEEGGCCDDEFIIIIIIIIIJJJIIJIJIIIJGGEEEEFGGIIFILIIIF................FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+    "ECELJCDFGGGIIGGIGIGGGGGGGGFGGGIIFJGFFEEFGJ..........................................................",
+    "CG.LDEILLLLLJIJGFFFFFFIGFFFFGFIIJIIIIIIII...........................................................",
   ]},
-  crocomire:{ pal:{A:'#b57f5f',B:'#593018',C:'#f32810',D:'#a82010',E:'#702010',F:'#601810',G:'#3a1008'}, rows:[
-    "....................DDFFF.................",
-    "...................FGDDDDDFFF.............",
-    "................GGFCCCCCDCCCDDD...........",
-    "...............FDDDCDCCCDDFCCCF...........",
-    ".............FCCCDDFGGFDDDDDCCC...........",
-    "...........DCDCDFFFBAABFFDFDCCD...........",
-    ".........DDCFFDGAAGAAAA.DDFCDDD...........",
-    "........DCFDBAGAAAGBAABDDFDCFDD...........",
-    "......GDCFBGAAGBAA..BBFDFFDDDCCC..........",
-    ".....GDDDBA.BA..FDDDDDDFFFDDDCCF..........",
-    ".....FFFG...GFFDDDFFCCCFFGDDFDCD..........",
-    ".....FGGGGG..GFFGG.GDCDFGGDDFFDF..........",
-    ".....GFG...GGFFG.DCFDCDGGDDDDGF...........",
-    "......G....B.GGFDDDDFDFFDFDCDGFD..........",
-    "...........AABBGFGFDDDGCFFDCDFFDF.........",
-    "...........AAAABDDFFDDFFGFDDFFFDD.........",
-    "..........AAAABDFDDDDDDFFDCDFDFF..........",
-    ".........BAAAAFFFFDCCDFFFDCCDDFG..........",
-    ".........AAAABDDDDDDCDFFDFDCCFGG..........",
-    "........GAAAADDCCCFCCDFFDDFDDFF...........",
-    "........AAAAAFCCCCFCCDFFDFFFFGFF..........",
-    "........AAAABFDCDCGDDFFFDFFDFFG...........",
-    ".......GAAABFFDCDCGGGGFFGDFFGF............",
-    ".......BAAAAFDDDCDFDDGGFDFFFGD............",
-    ".......AAAAAFDFDDDFFFGGFFFFDGG............",
-    ".......AAAAAFDDDCFDCDGFFDFDFG.............",
-    ".......GAFDBBFDFFDGCDGDDCFFG..............",
-    ".......GADCDAFDFDCGFGDFFDFCDF.............",
-    "........ADCDDDDCDGGDDCDDDDDFDDD...........",
-    "........GBCGDCDFGFFDFFCDCDFBFFDD..........",
-    "GGGFDGG.GGFCDGGGBGFFGFCFCDGAAAFEDDD..DFBF.",
-    "GEDGDDDCCDDFFBGGGGG.BF..CF.GBAAABEEFEB....",
-    "AGEGGGFEDGG.BBGGGGAADDFDCDAA....AAAB......",
-    "G.A..B.A...........A..F..F................",
+  crocomire:{ pal:{A:'#f1d1c1',B:'#c09070',C:'#f87818',D:'#885840',E:'#603018',F:'#583018',G:'#f82810',H:'#a82010',I:'#682010',J:'#601810',K:'#581810',L:'#381008'}, rows:[
+    "......................................................JJ.LJLLJJLL.............................................",
+    ".....................................................JGGHHJHJHHHHLJ...........................................",
+    ".....................................................LGHJJJHHGHGHJJJL.........................................",
+    "..................................................LLLLLLLHJHGGGHHHHHJJL..JC...................................",
+    "...............................................LLLHHHHLHGHHHHHHHHGGHHHHJJJJJ..................................",
+    "............................................LLLLJJGGGGGCCGGGGHHHHGGGHHGHGGJJJJ.H..............................",
+    "..........................................LLLLLHJCHGGCCCCCCGGGHHHGGGGGGGGGHHHHHHJ.............................",
+    ".........................................LHHLHHHHHHGCGGGGCCCGGGGHGGGGCCHGGCGHHHGJ.............................",
+    ".......................................LLJHJJJJHHGGGGGGGGGGCCGGHHHHGGGGCGGCCCGHJ..............................",
+    "......................................LLHGGGHHHJHGGGHJJJJHGGGGGHHHHGHJJGGGCCCCGHJJ............................",
+    "...................................LLLLHGGCGGGHJHGHJJLLLLJJGHHGHHHJGHJGHGHGGGGGHGJ............................",
+    ".................................LLHHHGGGCCCGHHJHHJLLF..LLLJHHHHHJHGHHGHGGGGGGGGHJ............................",
+    "...............................LLHHHGGGGCCGGHHHHJJLLFFFDFFLLHHHHJJHGHHHHHGGGHCCGGHJ...........................",
+    "..............................LHHGHGGHGGGHJJJHHJJL.FFDDBBDFLJJJJJHGHHJHHHHGGJHCGHHJ...........................",
+    ".............................LHGGHHJJHGHJLLLLLJJLLFDAABABDDLLJJJHHHHHJHHGHGCHGCGHJ............................",
+    "...........................HHGCCCCGGHGGHLLFF..LJLLDBAAAAABD.L..JHGHHJJHHGHGCGHGHHJ............................",
+    ".........................CGJHGCGHJJJHHHJLFDFD..LLFFDBAAAADF...JHGHHJJHHHGHHGGHJHH.............................",
+    "........................LGHHCCCHJLLLJHHLFDADBBF.LFDDAAAAABB..JHHGHHJJHJHCHHHHHHHJ.............................",
+    "......................LLGGGGJGHLLF..LJLLDAAABBF.LFFDBBBBBFDF.HHHHHJJJHJHCHJHHHHJ..............................",
+    "...................LLHHGGHHGJHJLFDDD..LFDBAAABDFL.FFDDBBBDFFJHGHHHJLHHJHCHJJJHHHJ.............................",
+    "..................LHHHCCHJJJJJJLAAABD.LFFBABBBDFL..FFFDDDFFLHHGHHHJLHHJHGHJHHGGHHJ............................",
+    ".................LJJGGCHLL..LJLFBBAAB.L.FDBDBDF..L..FFFFFFLJHHHJJJJLHHJHHHJGCCGGHGJ...........................",
+    "...............LLHJHCCGHLFFBFLLFBAAAB...FDDDDDF.......FFLJJHGHLLJJJJLHHJHHHGCCCGGGG...........................",
+    "...............LHJJGCGHLFAABF.LFDBBDD.....DFF..L.JJJJJJJJJJHHJLLJJJLLHHJJJHHCCCGGHGJ..........................",
+    "..............LHHJHHHHJLFBBBD.L.FDDFF..LL...HLLHHHJHHHGGHJHHJJJJJJJLLHGHJJJHGGCGGJJJ..........................",
+    ".............LHHJJHHHJJ.FDDBF.....F...JLLJHHGGGCCGHHHGGGHHGHHHHJJJJLHHGHHJJHHGGGGHHJ..........................",
+    ".............LHJLJHHJLL..FFF........LJJJHGGHHHHJHJJHHGGCGGGHJGHHJJLL.HCHHHJHHHHGGHHJJ.........................",
+    "............LJJJ.HJJLLL.......LLLJLJJHHGHGHHJHJJLJJJHHGCCCGGJGHJJJLL.HCGHJJJHHHGHHHJJ.........................",
+    ".............LJH.HJLL.LLLLL.LLLLLLLJHHJHHJJJJJLLLLLJJHGCCGGHJJHJJLL.HHCHHHJJJHJGHHHJ..........................",
+    ".............LJJ.JJLLLJLLLLLLL...LLLLLJJJJLLLLL....LJJHCGGHHHHJJLLLJHHJHHHJJJJJGJHHJ..........................",
+    ".............LLJLLLJHLLLLL.........LLLLLLLLLLL......LJHGGHGHHJJLLL.JHHJHGHHJJJJHJJJ...........................",
+    "..............LJJLJHLLLL....LLLLLLLJ.....L......HJJ.LJGGGGHJHLLLLL.JHGHHGHHJLLJJJJ............................",
+    "..............LJJLJLL......LLLLLJLJJJJJJLLL.JJHGCGGJJLGGGHHJJLLLJJJHHCHHGHHHLLLJJ.J...........................",
+    "..............LLJLLL............JLLJJJJJGJJHHHGGCGGHJJHGHHJJLLJJJHJHHCGHGHHHJLLLLJJ...........................",
+    "................LJL..........FF...LLLJJJJJJHGHHHGGHHJJHHHJJLL.JHHHJJHCGHGHHHJLLJJHH...........................",
+    ".................J...........DDFF..LLLLJJJJHGHJHHGHHHJHHHHJLLHGCHJJHHGGGGHHGJLLJJHGH..........................",
+    ".............................FDDFF....LLLJJHGHLLJCHJHJJHHJJL.HCCJJHJHJJGGHJGJ.LJJHGHC.........................",
+    ".............................FDBDDFFF..LLLLJHHLLLCHJHHJHHHJ.HCGHJJJHHJGGGHJJJ.JJJJGJGJ........................",
+    ".............................FDDBDDDDFF..JJJLLJJJGGJHHHHHHLJGGHJLJJHHGGGGHHHLLJJJHGJJJ........................",
+    ".............................FDAABABBDFF..HJJJJHJHHLJHHHHJLHGHJJLJJJHGGGGHHJLJJJJHGHJL........................",
+    ".............................DBBAABBDBBF.JGHHGHHJLLJJHHHHJLHHJJ..JJJJHGHHHJJ.JJJJGHHHL........................",
+    "............................DBDAABBABFEFJHHJHHGHHHJJJJHHJJHHHJJLLJJHJHHHHHJLJJHJHJJJH.........................",
+    "..........................LDDBAAAAABBDFHGGHJHHGGHHHHJJHHHHHHJLJJJGGCGGHHJLLJJHHHHJJJH.........................",
+    ".........................LLDBAAAAAABBDFHHHJJHHGJHGGHHHHHHHJJLLJHHHHGGCGHHJJJJHHHJJLLL.........................",
+    ".........................FDBABBAABBBDDIHHLLJJJJHHGGGGHHGGJJJLLHHHHHHHGCCHHHJHHHJJLLL..........................",
+    ".........................FDBAAAABBBDDFJHJJJJJJJHHHGGGGHGGHJJJJHJJJHGGHGGGGHHHJJJJLLL..........................",
+    ".........................FFDDBBDBBDDDJHJJHHJJJHJHHHGGCGJJHJJHHHHJLLJHGHGGGHHHJJJLLL...........................",
+    ".........................BBBBFDFDFDDJHHHHHHHHHGHHHHHHGGGGHJJJJHHHHJLJHCHGGJCJJJLLLL...........................",
+    "........................BBAABDDDDFFIHHHHGGGGHGHHJJ....GGGHHHHJLLJGHJJHCGHGJHJJJLLJ............................",
+    "......................LDBAAABBDDDDKHHGHHHHGGGGGGJJHGCGHJ.HJJJJHHJJGHJHHGJGHHJJLLJL............................",
+    "......................DBBAAABDDFDDFHHHHGGHHHGCG.LHGCCCGHL.JLJHHGHLHGHJHHHHGHJLLJJJL...........................",
+    ".....................LDBAAAABDDDDDFHHHGCCCGGHHC.JGCCCCGGH.JHLJHJHJLGHJHHHJGHJLLJHHJ...........................",
+    ".....................LBAAAABABDDDDJJHGGGGGCCCH.LJGCGCCGGHJ.GLJGJGHLGHJJHGJHHJ.LJHGJ...........................",
+    ".....................LAAAABABBBDDFJJGHGGHHGGCC.LJHGGCCGGHJ.HLJHHGHLGHLJHGJJJJ.LJHHJ...........................",
+    "....................LDBBBAAABBDDDFJHHHHHJGGGGG.LLHHGGGHHJL.HLHHHHHLGHLJHHHJJJLJJJJJ...........................",
+    "....................LDBAAAABBBDDDEJHHGHCJJHHGG.LLLHHHHHJJL.LJHJHHJLGHLGHHGJJHLLJJLL...........................",
+    "...................LLFAAABBDBDDFFJJJGHGCGJHHGG.LJLLJJJJLLL.JHJJHJLLHLJGHHHLJHLLL..............................",
+    "...................LLFFFBDDDDFFFLJJHHHGGCGGHGCCLLLJLLLLLL.JJJJHJLJHHJHHHHJLJGLJ...............................",
+    "...................LLDDBBBBBDDLLJHJJHHGGCGGHHGG.LJHLLLLLL.JJJJJLLHHHJHGJJJLLHLJ...............................",
+    "...................LDBAAABABDBDFJHHJJHHHHGGHHHHGLJHHLHJJ.LLJJJJHHHHJJHJJJJLLHGL...............................",
+    "...................FDAABBABDABDFJGGGJJHHJGGGJGHG.JHCHCJLLLLLLHHHJHJJHJJJJHLJHGH...............................",
+    "...................FBAAAAAABBDDFEHHGJJJHJHGGGGHC.JHCHGJLLLLLLLJJJHJHJJJJHGLJJGJ...............................",
+    "...................DAAAAAAAABDDDEHHGGJHGHHGGGHHG.JHGGGJJLLJLLLJJJHJJJLJHGGLJJHJ...............................",
+    "...................DBAABAAABBDDDEJHGGHHCHJHHHHJH.JJHHHJLJLLJLLJJJGLJJJHGGGLLLLL...............................",
+    "...................DBBAABBBBBDFDEJHJJHJGHJGGGGJL.JJJJLLL.LLLJJJHHHJJJHCHHHLLL.................................",
+    "...................DBAABAAAADDDFJJHHHHJGGJCCCJJHJHGGHHLL.JJJJHHHHHJJCHGJHJLL..................................",
+    "...................FBABBAAADDDFLJJHHHHJHHLGGGJJ.LHGCGHJL.JJHHJJHHHJHHHJHJLLL..................................",
+    "...................FDAAA.JJJLFFFLJJHJHHLLJHHHHJ.LHGCCHHJ.GHHJJGGGGHJJJJJJLL...................................",
+    "...................LDBA.JHHHJLDDDLJJJJJHJJJJHHL.LHHGGHHJ.HHHJHCCGHJJJLLLLL....................................",
+    "...................LFDB.JHGCHL.DDFLJJ...HHHJLLH.LJHHHHJL..HHJGCJJJJJJHGHJJL...................................",
+    "...................LFFB.JHGCCLJ.DDL.JJJ...LJHCCH.LJJJJLL.JJ.J.JHHHL.CCGHHJHJ..................................",
+    "...................LLDA.HHHCCLHJ.DJJJHHJ.JJGGGHG..LLLLL.HHJJ..JHGGHLCGHHHJJJJ.................................",
+    "....................LDBBHHHGGLCHJJJHHGLLHGCCGHHJJLL...HHGCHJJ.JHGCHL.GHHHJGHHG................................",
+    ".....................LBA.HGGHLGCHJ.HLLLHCCGGJLLLLL.H.JHGCC.JH.HHGCHL.HJ.JJHGHJJHJ.............................",
+    ".....................LBB.HCGHLGGCJLHCGGHGHJLLLLL..HCG.JGGJJHGGHHHGHLHHJJJJHHGGHGGJ............................",
+    ".....................LFB.JCGH.GGJJCCCCGHHJJJL..LJJHCG.JHHJHCCGHHGGHLJJLLLLJHHGGGGHGJ..........................",
+    "......................LFD.CGH.LJJGCGGHHHJJJ.JJJJJJJGH.JJ.JGGGHJHCGHL.LFFFFJJJJHHGGHJ..........................",
+    "......................LLF.HC.LHHCHGHJLLJLLFLLEJJJJJJJJ...GCGGHJHCGL..FLFDDFLLLJHJHGHJH................HJ......",
+    "..LLLL...LLLLLL........LLJLLHHGCGGJLLJLLLLLFLLLJJJJJLLLJJGCGHH.JCGL.LLFDBDDFFFLJHJHHGGJ..HJ.......HH..GGJJJJJ.",
+    "LLLLLLLHCHGGGGGHJLLLLLLLLHGGHGGHJLLLL..LFFFLFFLFLKJFFFLKJHHHJJ..GG..LLLDDDBDDBBDFDJJHHHGGHJJH.JHHHHHJJIEFF....",
+    "LBLHHHHGLHGGGHJGHHHHGCCGHCCGHHJLJJL..FFFDLFFDLLLLF.FF.FF.JJJ...JGC..LLLLFFFDDBBDFBDDJJJHHGGGGJGHJJJFDDF.......",
+    "LLDLGHHCHLHHGCHHHGCCCGHGHGGCHJLJJL.DFLLFLLFLFFLLLLF..FJE................LFFDDDDFBAABDEJJJJHHJJJJDFBF..........",
+    "BABLHHLHHHLHHGHHHCGGCGGGGGHHHJJLFAFFFFLLLLFLLFLLLF....GHJJ...JHHGHHLFFF......DDFDDBBDBABDEDEEADBBF............",
+    "BBDLLDLLHLLLLLLJJHGJHJJHHLJJLL..FBBFFFLFLLLLLLLLLFFFJJGGHJJJJJHGCCHLFAAF...........FBBBBFAABBBDF..............",
+    "LBD.LBDLL...JLLLJLL...GJLLLLL.JH.FFBFLLLLLLLLL..DBDAAB.HHJHHJHGGCGH..BABF.............DDFBBDFF................",
+    "LBL.AADL.FD...B...DBD.HLLL.........FF..LLLLL...DABDABB.JHHHHJJJHGGGJ.FBBBF....................................",
+    "LDL.LBL......FF.DBAB..........................FDF.DBF...JJJJ.J..JJJJH..FFF....................................",
+    ".L..LDL...........................................FF..........................................................",
   ]},
-  phantoon:{ pal:{A:'#adad6f',B:'#808040',C:'#6c6530',D:'#585820',E:'#413f08',F:'#303000',G:'#77001a'}, rows:[
-    "...........FDF................",
-    "..........FBABE...............",
-    "........FFEBABDFF.............",
-    "......F.FEDAAABEF.F...........",
-    ".....FFFFDDAAABDEFFFF.........",
-    "...FFFEFEDDAAADDDFEEFF........",
-    "..FFFFDEEBDAAADBDEEFFFF.......",
-    "..FEEEEEBBDAAADBBEEEEFF.......",
-    ".FFEDDDDBADBAADABBDBDEFF......",
-    "FFEEDBBAAABBABDAAAABDEEFF.....",
-    "FEEDBBAAAABBABDAAAABBDEEF.....",
-    "FEDBBBBAAABBABBAAAABBBDEF.....",
-    ".FEDBBBAAABBAABAAABBBDEF......",
-    "FFDDDBBBBBBBAABBBBBBDDDEF.....",
-    "EEDEDBBBBBBBAABBBBBBDEDEE.....",
-    "FFEEDDDDBDDAAADDDDDDDDEFF.....",
-    ".FEEEEEDDDDBABDDDDEEEEEF......",
-    "FEEFFFEEEEEBABEEEEEEFFEEF.....",
-    ".FFFFFFEEFFBABFFEEEFFFFF......",
-    ".F.FEFFFFFFBABFFFFFFEF.F......",
-    "...FFF.FEBBDABDBEF.FFF........",
-    "....F.FEBABBABBBBEF.F.........",
-    "..F...EDBDEDBDFDBBE....F......",
-    "..FEEFEBDEDEEEDEEBDFFEE.......",
-    ".EEEDDBD.BBDFDDB.DBBDFFE......",
-    "..D.FFFFDEGGGGGGBFFFFF.D......",
-    ".F.E.E.DDGECAAD.ED..EF.F......",
-    ".DDDFEFFGGAAAAAGGFFEF.DDD.....",
-    "..B.EFFDGGAAACAGGDEF..BD......",
-    "...B.EEDEGAACAAGGDE.BB........",
-    "..EEDD.DDGCAAACGDD.DDEE.......",
-    ".....EBDAEGEEEGGADBE..........",
-    ".....EEDDDDGDCDDDBEE..........",
-    ".....D.DEDDEEEDDED.B..........",
-    "....DFDEFD.DDBDDF.DED.........",
-    "...DDEE...DDEDDE..EEFD........",
-    ".........FFDFDEF..............",
-    ".....F....FDADF....F..........",
-    ".........F.DAD.F....F.........",
-    "....D....FEBABEF....D.........",
-    "....D.....DDDDDE....D.........",
-    "....D....FDDABDEF....D........",
-    "...DF....A.DD........B........",
-    "...DF................D........",
+  phantoon:{ pal:{A:'#f8f8f8',B:'#d8d888',C:'#a8a870',D:'#a8a868',E:'#909058',F:'#808040',G:'#6d6831',H:'#585820',I:'#860725',J:'#484810',K:'#404008',L:'#303000'}, rows:[
+    "................................LLLLLLL.............................................",
+    "...............................LKHFFFHKL............................................",
+    "..............................LKFFEEFFKKL...........................................",
+    "............................LLKHFECCEFFHKLL.........................................",
+    ".........................LLLLKHFFCBBCEFFHKLLL.......................................",
+    "........................LLLLKHHFECBBBCFFHKLLLL......................................",
+    "........................LLLLKHHFECBBBCEFHKLLLLL.....................................",
+    ".......................LLLLKKHHFECBBBCEFHKKLLLLL....................................",
+    ".......................LLLKKHFFFCBBBBBCFFHKKLLLL....................................",
+    ".................LLLLLLLLKKKHFFECBBBBBCEFHKKKKLLL.LLL...............................",
+    "...............LLLLLLLLLKKHHHFFECBBBBBCEFHHHKKKLLLLLLLLL............................",
+    ".............LLLLLLLLLLLKHHHHFFECBBBBBCEFHHHHKKLLLLLLLLLLL..........................",
+    "............LLLLLKKLLLLLKHHHHFFFCBBBBCCFFFHHHHKLLLLKKLLLLL..........................",
+    "............LLLLKKKKLLLLHHHHFHHFCCBBBCCFHFFHHHKLLLLKKKLLLL..L.......................",
+    "........LLLLLLLKKKKKLLLKHHFFFHHFCCBBBCCFHFFFHHHLLLLHKKKLLLLLLL......................",
+    "........LLLLLLLKKKHHLLLKHHFFFFHFCCBBBCCFHFHFHHHKLLLHKKKKLLLLLLL.....................",
+    ".......LLLLLLLLLHLLKKLLKHFHFFHHFCCBBBCCFHHFHFFHKLLKLLHHLLLLLLLLL....................",
+    "......LLLLKKLLLLHLHHKKKKHEEEFFHFCCBBBCCFHFHEEEHKKKLHLHHLLLLKLLLLL...................",
+    "......LLLKKKKLLLKHHHKKKKHEEEFHHFCCBBBCCFHHFEEEHKKKLHHKKLLLKKKLLLL...................",
+    "......LLKKKKKKKKLLKKKKKHFEEEFFHHCCBBBCCHHFHEEEFHKKKKLLKKKKKLKKKLL...................",
+    "......LKKKLLKHHKKKKKKKKFFCEEFHHHCCBBBCCHHFFECEFHKKKKKKKKHHKLKKKLL...................",
+    "......LKKKLLHHHHKKKKKHHFFCEEFHHHCCBBBCFHHFFECCFHHHKKKKKHHHLLHKKLL...................",
+    ".....LLLKKHHHHHHFHHHHHFFFCCEFHHHCCBBBCFHHFECCCFFFHHHHFHHHHHHHKKLL...................",
+    "..LLLLLKKKHHHHEFEFFFFFFECCCCEHHHCCBBBCFHHFECCCEFFEFEFEFFHHHHHKKLLLLLL...............",
+    ".LLLLLLKKHHLHHEFEFEEEEFECCCCEFHHFCBBBCFHHFECCCCEFEFEFEEEEHLLHKKKLLLLL...............",
+    "LLLLLLKKKKHHEEECFEEEEEECCCCCEFFHFCBBBCFHFHECCCCCEFEFEFCCEEHHKKKKKLLLLL..............",
+    "LLLKKLKKKKFFHHEEECCCCCCCBCCCEFHHFCBBBCFHHFECCBBCCCCCCEEEEHHFKKKKKKKLLL..............",
+    "LLKKKKKKKHHFFHFCCECCCCCCCBCCEFFHFCBBBCFHFHECBBCCCCCCECCCFHFHHKKKKKKKLL..............",
+    "LLKKKLKKHHFFEEEEECCCCCCBBBCCEEHHFCBBBCFHHEECBBBBCCCECEEEEEHFHHHKKKKKLLLL............",
+    "LLKKKLKKHHHFFEEECCCCCCBBBBCCEFFHFCBBBCFHFEECBBBBBCCCCCEEEEFFHHHKKLKKLLLL............",
+    "LLKKKKKHFHHFFEECCCCCCCBBBBCCEFFHFCBBBCFHFEECBBBBBCCCCCCEEEFFHFHKKKKKLLLL............",
+    "LLLKKHHFFFFFEECCCCCCCCBBBBBCEEFHFCBBBCFHFECBBBBBBCBCCCCCEEEFFFFHHKKKLLL.............",
+    "LLLLKHHFFFFFEECECCCCCCBBBBBCCEFFFCBBBCFFFECBBBBBBCBCCCEEEEEFFFFHHKKLLL..............",
+    ".LLLLLLHFFFFEEEEECCCCCCBCBCCCEHFFCBBBCFFHECCBBBBCCCECEEEEEHFHFFHLLLLL...............",
+    ".LLLLLKHHHHFFFECEECCCBBCBBCCCEFHFCBBBCFHFECCBBBBBCCCEECCEFFHKHHHKLLLL...............",
+    "..LLLLKKKHHHFFFFFEEECCCCCCCCEEHFCCBBBCCFHEECCCCCCCEEEFFFFFHHHKKKKLLL................",
+    ".LLLLLLHHHFFFHFFFFFEECCCCCEEEEFFFCBBBCFFFEEECCCCCEEFFFFFFHFFHHHHLLLLL...............",
+    ".LLKKKHHHHFFFFHFFFFFFEEFEEEEFFFFCCBBBCCFFFFEEEEEEFFFFFFFFFHFHHHHHKKLL...............",
+    "KKKKKKHHHHHHHFFFFFFFFFEFEEEFFFFFCCBBBCFFFFFEEEFFEFFFFFFFFFHFHHHHHKKKKKL.............",
+    "KKKKKKHHHHHHHFFFFFFFFFFFFFFFFFFFCCBBBCFFFFFFFFFFFFFFFFFFFFHHHHHHHKKKKKLL............",
+    "KKKKKHHHHKKHFFFFFFFFFFFFFFFFFFFFCCBBBCFFFFFFFFFFFFFFFFFFFFFKKHHHHKKHKKLL............",
+    "LLKKKHKKKKKHFFFFFFFFFFFFFFHHFFFFCCBBBCFFFFFHFFFFFFFFFFFFFFFHKKKKKKKHKLLL............",
+    "LLLLLLKKKKHHFFHFHFFFFFFHFHHHFFHFCCBBBCCFHFHHHFFFFHFHFHFFFFHHKKKKKLLLLLLL............",
+    "LLLLLLLKKHHHHHHHHLHHFFHFHFHHHHHFCCBBBCCFHHHHFFFFHFHHLHHHHHHHHKKKLLLLLL..............",
+    "..LLLLLKKHHFFHHKKKKHHFFHFHHHHHHFECBBBCEFHHHHHFFFFHHLKKKHHHFHHKKKLLLL................",
+    "..LLLLLKKKHHKKLKKLKHHHHHHHHHHHHHFCBBBCFHHHHHHHHHHHHKLKKKKKKHKKKKLLLL................",
+    "..LLLKKKKKHHKLLLKKKHHHKHHKKHHKKHFCBBBCFHKKHKKHHHKHHKKKKLLLKHKKKKKKLL................",
+    "..LLKKKKKKKKLLKKKKKKHKKHHKKKKKKHFCBBBCFHKKHKKHHHKHHKKKKKLLKHKKKKKKKLL...............",
+    ".LLKKKKKKKLLLKKKKKKKLKKHHKKKKKKHFCBBBCFHKKKKKKHKKHLKKKKKKKLLKKKKKKKKL...............",
+    ".LKKLKKKKLLLLKLLKKKKHHKKKKKKKKKHFCBBCEFHKLKKKKKKKHHKKKLLLKLLLKKKKKLKL...............",
+    "..LLLKKKLLLLLLLLLKKKHKKKKKKKLLKHFECCCFFHKLKKKKKKKHHKKLLLLLLLLLLKKLLKL...............",
+    "..LLLLKLLLLLLLLLLKKKKKKKKLLLLLLHFFCCCFFHLLLLLKKKKKKLKLLLLLLLLLLKKLLL................",
+    "..LLLLLLLLLKKKKLLLLKKKKLLLLLLLLKFFCCCFFKLLLLLLLKKLKLLLLKKKKLLLLLLLLL................",
+    "..LLLL..LLKKKLLLLLLLLKKLLLLLLLLKFFCCCFFKLLLLLLLKKLLLLLLLLLKKLLL.LLLL................",
+    "...LLL.LLLLKKKLLL.LLLLLLLLLLKKLLFFCCCFFLLKLLLLLLLLLL.LLLKKKLLLLLLLL.................",
+    "........LLKKKLLLL......LKKKHHHHLFFCCCFFLHKHKKKKL.....LLLLLKKLLL.....................",
+    "........LLLKLLLLL.....LKHHFFFHHHFFCCCFFHHFFFHHKLL....LLLLLKKLL......................",
+    "........LLLLLLLLLL..LLLKHFCCCFFHFFBBCFHHFCCCFHHKLLL.LLLLLLLLLL......................",
+    "........LLLLLLLLLLLLLKKHFCCCCCCCFFBBBFFCCCCCCFHKKKL.LLLLLLLLLL......................",
+    "...........LLLL.LLLLKKHFCCCCCCCCCCBBBCCCCCCCCCFHHKLLLL..LLLL........................",
+    "...........LL.....LLKHHFCCFFFFFFCCBBBCCFFFFFCCCFHKLL......L.........................",
+    "..................LKKFFCCFHHHHHHFFCCCFFHHHHHFCCCFKKL................................",
+    "...LLL............KKHCCCFHHHKLLHHFFFFFHHLLKHHFCCCHKK............LLL.................",
+    ".....LKL........LLKHFCCFHHLKK..LHHHHHHHL..KLHHFCCFHKLLL.......LKKL..................",
+    "......LKHHKLL...LKKHCCFFHL.KKKK..LLLLL..KKK.LHFFFCHKKLL...LLKHHKL...................",
+    "......LKHKKKLLLLKKKHFFFFHLKKHHHKKKKKKKKKHFHKLLHFFCFHKKLLLLKHKHKL....................",
+    ".......KKKHHHHKKHFFFFFHKLKHHFFCKHCHHHHKKCFFHKKKHHFCFFHKKKHFHHKKK....................",
+    "..KHHFLKKKHHHHFFCCCCFHHK.HCCFCCHHCHHCCHHCFCCHH.KHFCCCCFFHHFHHKKKFFHKL...............",
+    "..KKHFKLKKLLHHFFCCCFHKK.KFCCCFCHHCLLLHHHCFCCFH..KHFCCCFFHHHLKKKLKHHKL...............",
+    "...LLKKL.KKLKKHHFFFHHK..KFHCCFLLLLLLLLKLLFCHFFK..KHHFFFHHKLLK.LKKKL.................",
+    ".........LLLLLKKHHHHLL.KCHLKLLLLII..IIILLLLLHCCK.LLHHHHKKLL.L.......................",
+    "...LLHHL.LL.LLLLLLLLLKKHCCLLIIIL.II.II..ILILCCCHK.LLLLLLLL..L.LHHHL.................",
+    ".KHFFCH..LLL....LLLL.HHFLCIILIIJJJJJJJJJ.I.LCCFFH..LLLL....LL..HCCFHK...............",
+    "..LLLLL.KKLLKKK.....KCCCL.IIIJJGGDDDDDGGJ....LCCCK.....KKK.LLKKLLLLL................",
+    "...LLLL.KKL.KKKL.L..KHCCKLIIIJGDBBBBBBDDGJ.ILLFCCHK.L..KKK.LKKK.LLLL................",
+    "...KKKH.HKK.KKFKLLLKHHHFLIIIHGDBBBBBBBBBDG.IILLHHHK.LLLKKKL.KHH.HKKK................",
+    "LHHHFCH.FH.LLKFFKLLKKKKLLIIIGDBBBDDDDDBBBGJIILLLKHKLLKKFKKL.KFFHHFFHHL..............",
+    "LHHFFCHKF..LLLKFKLLLLKLLIILJGBBBDAAGGDDBBDGIIILLLLHLLKKKLLLK.FFHCCFHHL..............",
+    ".......K..KKL.LKLLLHHKLLII.GDBBDDAALGDDDBDGIIIILLLHLLLKKL.LK..KK....................",
+    ".....KFF.FFK...KLLLHHLLL.IICDBBDGAA.LGDDBDGIIILKLLH.LLKK...KF.FFFK..................",
+    "...HHFCH...KKL..LKKHHCCCLLIFDBBDGL..LGDDBDGILLCCCHH.KLL.LLK...HCCFH.................",
+    ".LKHHKK..HHFFK.K.KKKHCCLLIIFDBBDDGLLGDDDBDG.IILCCHLKK.KKKKF.H..KKHHKL...............",
+    "........FFF...FL.KHHHHHLLL.JGBBBDDGGDDBBBGJLLLKHHH.HK.LFF...FFF.....................",
+    ".......HCFF...FL.KKHHHFCCLIGGDBBBDDDDDBBBGJILLCFFH.HK..F..K.FCF.....................",
+    "......KHCKKKF.HF....HFFCCIIIGGDBBBBBBBBBDGIIIICCFH.K...F..FKKCHK....................",
+    ".....LKKKKKFF.FFK..FFHFCLII..JGDBBBBBBDDGJIIIKHFFLFH.KHFF.FCKKKKK...................",
+    ".....L..KKFHH.FHK.FFFHHCCCL..GJGGDDDDGGGCLIICCCHH.FF.KKHF.HCFK......................",
+    "........KFFKK.KKK.FFFHHCCCLLII.JJJJJJJJJI.LICCCCH.FF.KKKK.K.FKK.....................",
+    "...............KK.FFHLLHCLLIIII..I.IIILLIILLLCCHL.HF.KKK............................",
+    "..................HHK..HHCCCILLIILLLLIIILLICCCHH..KH................................",
+    "...............LK.KKFF.HHCHHHCCLLCHHCCLLCHHHCCHH.FKK.KKL............................",
+    "..............LHK.KHFF.LHHHFFHHFFHHHHFFFHHFHHHHL.FHK.KHHL...........................",
+    "..............LFF..HFF.LHHHHFFFFFHHHHHFFFFFHHHL..FFK.FFHL...........................",
+    "..............LFCK.FHH.KLHHHHFFHHKKKKHHHFFHHHHK..HF.KCFH............................",
+    ".............L.HCKKHKK.KH.LKKKKKKKHHHKKKKKKL..KK.KH.KCFH.L..........................",
+    "............HH.KFFKKKK.LHHK....KHFCCFHKK...KHHKL.KKKFFHKHH.L........................",
+    "..........LLHH.LHFFKKK.LKHKK...KHFCCCFHK...KHHKL.K.KFHHLHH.L........................",
+    "..........FFFFL.KHHHKK..LLHHHHHHFFKKFFFHHHHHLLL..K.HHKKLFF.F........................",
+    ".........HCCHLHL.KHHK.....KHHHHFH....HFFHHHK......KHK.LHHLHCH.......................",
+    "........HCCHL.LK.LLLL..LL..KKKK..KKKKK..KKK..LLL..LLL.KKL.LHCHH.....................",
+    "........FFL....H........LL.....KHFCCCFHK....LLL.......HH....LFF.....................",
+    "........FF.....H........LLLL..KHFFCCFFHHK.LLLL...L....HH....LF......................",
+    "...............H.........LLLLKKHFFLLFFHHK.LLL....L....HH............................",
+    "..............LK.............LLLL.HH..LLL.L...........KL............................",
+    "..............LL..........L..LLLHHCCHHHLLL.L..........LLL...........................",
+    "..............LL..........LLLLLLHHCCCHHLLL.L..........LLL...........................",
+    "..............K...........LKK..HHFCCCFHH..KL...........KK...........................",
+    "............LLL...........LKKKKHFCCCCCFHKKKL...........LLL..........................",
+    "............KKL..........LLL....LHCCCHL....LLL.........LKK..........................",
+    "...........LHH...........LLLKKK.........KKLLLL..........HHL.........................",
+    "...........LHH...........LLLKKKHFFCCCFFHKKKLL...........HHL.........................",
+    "...........HHH............LKKHHHFCCCCFFHHHKL............HHH.........................",
+    "...........HHL..........L...HHHHFCCCCFHHHHK..............LH.........................",
+    "...........HF...........LLLKKHHLHHHHHHHLHKKLLLL...........FL........................",
+    "..........LFF...........LLLKKHH.........HKKLLLL...........FL........................",
+    "..........LFF...........LLKK.HHHHFCCCFHHH..KLLL...........FL........................",
+    "..........HHH...........LLLKHHHHFCCCCCFHHHKLLLL...........HH........................",
+    ".........LFFL...............LLLKHFCCCFHKLL................LFL.......................",
+    ".........LCCL............CHH...............HCC............LCL.......................",
+    ".........HCCL............CH...HCH.HH..CCH..HCC............LCH.......................",
+    ".........HFFL............C....HCH.CCC.CCH...C.............LCH.......................",
+    ".........HHHL..................C..CC...C..................LFH.......................",
+    "..........LL..............................................LHL.......................",
   ]},
-  ridley:{ pal:{A:'#d8a3c3',B:'#d2768c',C:'#ac768c',D:'#c2434a',E:'#764061',F:'#a31139',G:'#4b1536'}, rows:[
-    "..............A.............................",
-    "...........EECAGEC..........................",
-    "........ECAADDEACCAG........................",
-    ".....EECCAEDDD.CACCAG.......................",
-    "...EEACCCCCGCC.CEEECCA......................",
-    "..ECACCCCCA.AGCGCGGGEE......................",
-    "..CCC.AA..AGGGGGC...........................",
-    ".EE.A......GEEEC............................",
-    "...A.......CAEEG............................",
-    "..........ACEGGG............................",
-    "........ACE..EE..EC.........................",
-    ".......CCC...CA.ACE.........................",
-    ".......CC....CAAEEE.EE..G...................",
-    "............ECGEEEEECA.AADFFE...............",
-    ".............ECE.CECEAGFFFDDDE..............",
-    "..............E..CAAGEEFFFDDABD.............",
-    ".................ECEECCCDDDDFDDD............",
-    "................CAEACECCDFFFFDDCE...........",
-    "................CGGAACCCCBEAACE.............",
-    ".................GGEECACEA..................",
-    "...................EAAGE.A..................",
-    ".........EEE......CECEAAEA..................",
-    "........AE.EEEAEECCCG.ECEE..................",
-    "........AE...AEEEECCACEEAC.C................",
-    "........AE..EEAA.EEECACECEEGEEA.............",
-    "............EEEEE.EEECEECCEECGEEA...........",
-    "...................EEECCGGGCEEECGEC.A.......",
-    "..................EECEC..CGGCECCEAEGEC.C..C.",
-    "................ECAECEEE....EGEGEEGEAEEGEEGE",
-    "...............ECCEE.CECE...C.C...CGEGECGECG",
-    "..............ECCC.....EA..............EG.EG",
-    "...............C............................",
+  ridley:{ pal:{A:'#ffe0df',B:'#ffaccd',C:'#e2accd',D:'#c48ca6',E:'#db768c',F:'#ac768c',G:'#d54543',H:'#764061',I:'#764036',J:'#e80434',K:'#562040',L:'#4b1536'}, rows:[
+    ".....................................HFCAH..............................................................................",
+    "..................................HHHFCAAHKKKK..........................................................................",
+    "..............................HHHHHHCAAAAFKHFFCK........................................................................",
+    ".............................HHFAACFLCFCACKHFFFCFK......................................................................",
+    "..........................HHHFCAAAFH.LHHCAFFFAAAFDK.....................................................................",
+    "........................HFHAAAACCHLGGG.HHCCDAAAHFFFKK...................................................................",
+    "....................HHHHFFACCCHHHGGEEGG.HHACHHFFCAAAFKK.................................................................",
+    "...............HHHHHHHFFACCHHIGGGGEGGGG..FCCCFHFCCFFAAKK................................................................",
+    "..............HFHFAFCCCH.LH..IGGGGLLGG...HCCCCCFCCFFACCKK...............................................................",
+    ".............HFFACAFC..HHHHHHFFFFFLFLL.L.HHHHCCACFFFCFFFKKK.............................................................",
+    "..........HHFCCCACFHHHHHFFFCHCFF.CCFFF.LL.FHHHHCCCCAFKKFFFCK............................................................",
+    ".........HHHFAACLHFFFFFFCCCCCCCL..CFFF..LFFHLLHHHCCACHACCCCKK...........................................................",
+    "........HHHHHAAFFCCCCCCCCCCCCLCLC..LLL.H.FHH...LHLHHCHACCCCKK...........................................................",
+    "......HHHFH.HCCCCFFFFFCLF.FFA...CAAFFL.HF.HLFFLLLLLLLHHHHHHKK...........................................................",
+    ".....HHFCCACCCFFF..FF..FA..CA.CC.FCLLCA.HLLLAAF.L.......................................................................",
+    "......FFFCCFFF...FCAA..CA..CCLLAALCCA.F.LLAAA.LL.FF..K..................................................................",
+    ".....HFFFFFF....FA.CCC..C...C.LLCCLF..LLLLLFFAA.........................................................................",
+    ".....HFFFFH..FA..CC.CC.........LLFFLLLFF.ALLLLFF........................................................................",
+    "....HHFHHH.F..A................LLHLHHH.ALLFFAA..........................................................................",
+    "....HHH....CC.C..................FFCFHH.LLFA............................................................................",
+    "....H...A..CC....................CCCFHH.................................................................................",
+    "........FC.....................FFCAFFHH.LL..............................................................................",
+    ".........C.................C.C.FCCCFHHH.LLL.............................................................................",
+    "...........................A.CFCCFHHH.LLLL..............................................................................",
+    "...........................F.HFFFHHHLLLLHL..............................................................................",
+    "........................C...HCFHH...LLLLL........LL.....................................................................",
+    ".....................CC.A..HHFH....KHHHH........L.FL....................................................................",
+    ".....................AA.F.HFFH......HFFH........HDAF....................................................................",
+    "....................AAAH.HFFH......KFCHD......FD.DDH....................................................................",
+    "...................HCCFHHFCHH......HFCHCK...KAAD..HH....................................................................",
+    "..................HFCCCFCFH........HCHC....FADDHHHL.....................................................................",
+    "...................FCCCCFH.........HCHA...AADDHHDH.H....................................................................",
+    "...................FFCFHH.........HFAFC...CDDHHDD.HH...HHHHKK.....CC....................................................",
+    "....................HHH...........HFAFD..FDDHHHDH.H...KHHHHKK...KDCK...H................................................",
+    "..................................HFAFFHHFFHH.DD.HL.HFFFF...K..KCCD....H......HF........................................",
+    "..................................HFCFKHHHHH..HHHHL.HHFF...H..KCADD..DGFJJJ.HHH.........................................",
+    "..................................HCFHKLHFHK.HHHDH.HHHDDHDDDHKKAHDCCDGHJJJJHHJJ.........................................",
+    "....................................HHFFCFK....DHFHHFHHHHCCDDK...HJJEEJJH.HHJJJJ........................................",
+    ".....................................HFCH.....HDFHFCACFHHDAD.K..JJGFEJJHHFHJJJAA.HHH....................................",
+    ".....................................HHF......DHCHHFCAAC.HDA.K..JJFEJJGHFHJJJAAAHHH.....................................",
+    "......................................HH.....HFCH..HHCCFF.HDDH.JJHEJJJEFHHJJAAAHCCEJ....................................",
+    ".......................................H.....HH.CCACH.HKKK.HHHHJHFJJJFFHJJHHHHFEBAAJJ...................................",
+    "...............................................HCACFH..HK..HFCHFFGGFFFGGGHECECJJJJAAJJ..................................",
+    "...............................................HCCFKHHHHHHHFFCHF.GFFFGGGCCECJJJJJJJJJJJ.................................",
+    "...............................................CCFHKHFFFFHFCHHFFHFHHFFFFCCJJJJJJJJJJJJJ.H...............................",
+    ".............................................HFCDH.HFCFFFFFHHFFHCCFFEEEEJJJJJJJJJGGGEFFFH...............................",
+    "............................................FFACHK.HCCAFHHHH.CCCCCEEJJJJJJJGGGGGFFFFFFFFH...............................",
+    "............................................FAAHKK.HFAAFHHHHHHHHFGHJJHHHHFDDCDDDDFFHHHHH................................",
+    "............................................HFFKKK.KFCAADDFF.FFFFDFFDCCAAACCDHHHHHHH....................................",
+    ".............................................HH.KKK.HFCCCCFFFFCCCAACCCFHHHHH............................................",
+    "..............................................HH.KK..HCC.HH..HHH.HH...HH................................................",
+    "..............................................KK..K....HH.FFC....HDDHDDH................................................",
+    ".....................................................HHHHCC..CCF.HDDAADH................................................",
+    ".....................................................HCCFFADK..DHH.DDC..................................................",
+    "...................................................H.HCAAFCCH.KDH..D..HH................................................",
+    ".................................................HHH.HHCCCCHCDKHDD..CDDH................................................",
+    ".........................H.HDD.H...............HFFFF..HHCFHHCD.KDD.HCCH.................................................",
+    ".......................HDHHHDDHHHH.............HFFFF.H..FFHHDHDHDHHHAA..................................................",
+    ".......................HD.HHHHHHHHHH...HDHD....HH.K..H......H.DHKHH.D...................................................",
+    "......................CCDHD.H..HHHHHH.HAAHHH.HHFFCKCFKHKK..H.HDCKFKHHH..................................................",
+    "......................CDHDHH....HHHHHH..HDDKHFFFFFFKCKFKKKK...D..HDDH...................................................",
+    "......................AH.CHH.....HHH..DH.HDHHHHHHFFFCFCCHFFHH...HADDH......C............................................",
+    "......................AH.CH..........DH.HHHH......HHFFCCCCCFFH...HDD......HCH...........................................",
+    "......................CCHHD.......HH.DH.CH...HHK.....HFCCAACFH.HKK..HCCL..LFL..FCC......................................",
+    "......................DD.HD.......HDHAD.ADHD..HHFKFK.HFHHFCCCFH.KH.DDHHHLLLHLHLHFF......................................",
+    ".......................DH.H......HDHHAD.CDADH..HHFFFK.HFFHHFCFH.HFKDDHLHLHDLH..H..CC....................................",
+    "........................HHH......HDHHAD.CHADH...HHHFHKHHFFFFFFH.HFFF.FLLHHDHHCF..HFH...FC...............................",
+    ".........................H......HDHH.DH.AHDDDHH..HHHHKKKHFF.HHH.FFFFFCFLFHHHFCFLLLHLHLHCC...............................",
+    ".....................................HHHACHD.HH...HHHHKKHHHFCCF.FFCCFCFFF.HFCHHHLLLHHLHCFCC.............................",
+    "......................................HH.CC........HFHFFFHHHCCACFHFFKFFLHHFCCHHHLHLH..FH.CFH..C...C.....................",
+    "...................................................HHHHHHKKHHHCFK.KK...L.HFFLFLLHHHHFHCHLLHLHFCF..CH....................",
+    "...................................................HHFFHHKHH..HKHK...LL.LLHFCCFFFHHFCFL.LHL...FL..FL.FCC................",
+    "................................................H...HHCCFFFH.H.......FFL..LLLFFHHHFCCLLLHHHFFHCHLLHLHLCF...C.......CC...",
+    "..................................................H..HFCCFFH.CF.....HCCL.....LLLHFCCFCF.FFCCCFLLLHL.......HC......HCC...",
+    ".............................................FFH.HFAHHFAACFHCH......FFH...HFH.LLHFFFHLF.HCCCCFLLHH.HFHLFFLLFL.LFFLLFFLLF",
+    "...........................................LHHHHF..CCHFCCCFFF.HH...........C.L.LLHHHLL.L.HFFHCCFF.FCCFLHHHLLLLHHHHLLLLHH",
+    "...........................................FLLCFFCKHFKHHFHHCHHHHH...........HFL..LL...L.LLHHLLLFHHCCCFFFLLFLCFFCLLFHLCF.",
+    "..........................................HH.CCCCCCLHHKHHHHFLHFCAH..........FFF...FH..FL.....FFLLHFFHLFFFFHFCFFCFFHHCCHL",
+    ".........................................HH..FFHCFFLHK.....F.HFCAH..........FH....FF..FL......F.LLHHLLLFFHHFCHLLFLHFFHL.",
+    "........................................HHHFFCCFHHHLHK.....F..HFCFH...........................FL..L..FFC.LHFHL.L.LHFHLLL",
+    "........................................HHHFACCF.HL............HFCC............................L..C...CC..LHLLLFF.LHLLLL",
+    "........................................HHFCCFFHL.L.............HFC...............................C.......HH..LFF.HHF..F",
+    "........................................HFCCHH..L................FF........................................C.......CC...",
+    "........................................HFFFH....................HH.....................................................",
+    ".........................................FFH............................................................................",
+    ".........................................HH.............................................................................",
   ]},
 };
 const BOSS_SPRITE_KEY = { 'KRAID':'kraid', 'CROCOMIRE':'crocomire', 'PHANTOON':'phantoon', 'RIDLEY':'ridley' };
@@ -638,7 +908,13 @@ function drawSamus(ctx, cx, cy, palette, walkPhase, facing, invulFlicker){
   const u = SAMUS_UNIT;
   const w = SAMUS_WIDTH*u, h = rows.length*u;
   ctx.save();
-  ctx.translate(cx - w/2, cy - h/2);
+  // 動感：待機時輕微呼吸（squash&stretch），移動時朝行進方向前傾
+  const breathe = player.moving ? 1 : 1 + Math.sin(elapsed*2.6)*0.014;
+  const lean = player.moving ? 0.07*facing : 0;
+  ctx.translate(cx, cy);
+  ctx.rotate(lean);
+  ctx.scale(1, breathe);
+  ctx.translate(-w/2, -h/2);
   if(facing < 0){ ctx.translate(w,0); ctx.scale(-1,1); }
   const legOffset = Math.sin(walkPhase)*1.8;
   for(let r=0;r<rows.length;r++){
@@ -1427,7 +1703,11 @@ function updateProjectiles(dt){
         const wasAlive = en.hp>0;
         damageEnemy(en, p.dmg);
         if(p.slow && wasAlive){ en.speedMult = Math.max(0.25,(en.speedMult||1)-p.slow); en.slowTimer=1.4; }
-        if(p.freeze && wasAlive){ en.frozenTimer = 1.0; }
+        if(p.freeze && wasAlive){
+          if(en.giant){ // 巨型頭目防永凍：短凍結+免疫冷卻（高射速冰束否則會讓頭目全程不能動）
+            if(!(en.freezeCd > 0) && !en.entering){ en.frozenTimer = 0.8; en.freezeCd = 4; }
+          } else { en.frozenTimer = 1.0; }
+        }
         if(p.shatter && en.hp<=0){
           for(const other of enemies.slice()){ if(dist2(p.x,p.y,other.x,other.y) < 55*55){ damageEnemy(other, p.dmg*0.4); } }
           spawnBurst(p.x,p.y,'#eafcff',18,150,0.4);
@@ -1582,13 +1862,14 @@ const ENEMY_TYPES = {
   rinka:{ introduceAt:600, baseHp:20, baseDmg:10, baseSpeed:145, r:9,  weight:1.3, flyer:true, color:'#ff8a3d' },
 };
 const BOSS_TABLE = [
-  {t:300,  name:'KRAID',     color:'#ff6a1a', hp:5000,  dmg:26, heightFrac:0.70, grounded:true},
-  {t:600,  name:'CROCOMIRE', color:'#ff9b3d', hp:9000,  dmg:22, heightFrac:0.48, grounded:true},
-  {t:900,  name:'PHANTOON',  color:'#9b59d0', hp:14000, dmg:30, heightFrac:0.60, grounded:false},
-  {t:1200, name:'RIDLEY',    color:'#c0272c', hp:22000, dmg:38, heightFrac:0.44, grounded:false},
+  {t:300,  name:'KRAID',     color:'#ff6a1a', hp:80000,  dmg:26, heightFrac:0.70, grounded:true},
+  {t:600,  name:'CROCOMIRE', color:'#ff9b3d', hp:150000, dmg:22, heightFrac:0.48, grounded:true},
+  {t:900,  name:'PHANTOON',  color:'#9b59d0', hp:250000, dmg:30, heightFrac:0.60, grounded:false},
+  {t:1200, name:'RIDLEY',    color:'#c0272c', hp:380000, dmg:38, heightFrac:0.44, grounded:false},
 ];
 let bossSpawned = {};
 let bossBattle = null;      // 進行中的巨型頭目戰（指向該頭目物件）
+let pendingMidBoss = null;  // 排隊等待公告的中頭目
 let enemyProjectiles = [];  // 敵方彈幕
 const MAX_ENEMY_PROJECTILES = 90;
 
@@ -1645,9 +1926,6 @@ function startBossBattle(entry){
   };
   enemies.push(boss);
   bossBattle = boss;
-  suitBanner.textContent = '⚠ ' + entry.name + ' 來襲！';
-  suitBanner.classList.add('show');
-  setTimeout(()=>{ suitBanner.classList.remove('show'); }, 1800);
 }
 
 function fireEnemyProjectile(p){
@@ -1664,14 +1942,14 @@ function updateBossBattle(dt){
   const b = bossBattle;
   if(!b) return;
   if(!enemies.includes(b)){ bossBattle = null; return; } // 已被擊殺
-  if(b.frozenTimer > 0) return; // 冰凍時暫停行動（獎勵冰系配置）
-  // 進場滑入
+  // 進場滑入（必須在凍結檢查之前：若凍結能中斷進場，冰凍光束會把頭目永久卡在場外造成軟鎖）
   if(b.entering){
     const dir = Math.sign(b.targetX - b.x);
     b.x += dir * 170 * dt;
     if((dir > 0 && b.x >= b.targetX) || (dir < 0 && b.x <= b.targetX)){ b.x = b.targetX; b.entering = false; }
     return;
   }
+  if(b.frozenTimer > 0) return; // 冰凍時暫停行動（獎勵冰系配置，giant有免疫冷卻防永凍）
   b.patternT += dt;
   b.attackTimer -= dt;
   const fireDir = b.faceRight ? 1 : -1;
@@ -1836,9 +2114,9 @@ function updateEnemies(dt){
   }
 
   for(const entry of BOSS_TABLE){
-    // 前一場頭目戰未結束時延後下一場（理論上間隔5分鐘不會撞，保險起見）
-    if(elapsed>=entry.t && !bossSpawned[entry.t] && !bossBattle && !finalBossActive){
-      bossSpawned[entry.t]=true; startBossBattle(entry);
+    // 前一場頭目戰未結束時延後下一場；排入公告佇列（由 update() 消化）
+    if(elapsed>=entry.t && !bossSpawned[entry.t] && !bossBattle && !pendingMidBoss && !finalBossActive){
+      bossSpawned[entry.t]=true; pendingMidBoss = entry;
     }
   }
 
@@ -1847,6 +2125,7 @@ function updateEnemies(dt){
     en.phase += dt*4;
     if(en.hitFlash>0) en.hitFlash -= dt;
     if(en.slowTimer>0){ en.slowTimer-=dt; if(en.slowTimer<=0) en.speedMult=1; }
+    if(en.freezeCd>0) en.freezeCd -= dt;
     if(en.frozenTimer>0){ en.frozenTimer-=dt; continue; }
     if(!en.giant){ // 巨型頭目的移動由 updateBossBattle 控制，不追玩家
       let tx=player.x, ty=player.y;
@@ -1899,7 +2178,7 @@ function killEnemy(index){
     for(const other of enemies.slice()){ if(other!==en && dist2(en.x,en.y,other.x,other.y) < 60*60){ damageEnemy(other, 14); } }
     if(dist2(en.x,en.y,player.x,player.y) < 60*60 && player.invulTimer<=0){ applyDamageToPlayer(10); player.invulTimer=0.4; }
   }
-  const gemVal = en.isBoss ? 45 : (en.elite ? 6 : (en.flyer ? 3 : 2));
+  const gemVal = en.giant ? 150 : (en.isBoss ? 45 : (en.elite ? 6 : (en.flyer ? 3 : 2))); // 巨型頭目血量大增，獎勵同步加碼
   if(en.isBoss){
     const gemCount = 14;
     for(let i=0;i<gemCount;i++){
@@ -2170,13 +2449,19 @@ function proceedAfterMenus(){
   // 勝利/失敗/未開始時不得把狀態拉回選單或遊玩（避免舊計時器蓋掉結局畫面）
   if(state==='victory' || state==='gameover' || state==='start') return;
   if(evolutionQueue.length>0){ const w = evolutionQueue.shift(); showEvolutionAnnouncement(w); return; }
-  if(pendingFinalBoss){ pendingFinalBoss=false; showFinalBossAnnouncement(); return; }
+  // QUEEN只在所有中頭目都打過且無進行中頭目戰時登場；否則交給 update() 的頭目連戰邏輯
+  if(pendingFinalBoss && !bossBattle && !pendingMidBoss && BOSS_TABLE.every(e=>bossSpawned[e.t])){
+    pendingFinalBoss=false; showFinalBossAnnouncement(); return;
+  }
   if(levelUpQueue>0){ openLevelUp(); return; }
   state = 'playing';
 }
 const bossAnnounceEl = $('boss-announce');
 function showFinalBossAnnouncement(){
   state = 'evolution';
+  bossAnnounceEl.querySelector('.boss-warn').textContent = '★ 威脅偵測 ★';
+  bossAnnounceEl.querySelector('.boss-title').textContent = 'QUEEN METROID';
+  bossAnnounceEl.querySelector('.boss-flavor').innerHTML = '動力服已完全覺醒，星球深處的最終威脅甦醒了。<br>擊敗它，證明薩姆斯的極限。';
   bossAnnounceEl.classList.remove('hidden');
   const rid = gameRunId;
   setTimeout(()=>{
@@ -2185,6 +2470,21 @@ function showFinalBossAnnouncement(){
     spawnFinalBoss();
     proceedAfterMenus();
   }, 2600);
+}
+// 中頭目登場公告（沿用威脅偵測畫面，短暫停頓後頭目滑入）
+function showMidBossAnnouncement(entry){
+  state = 'evolution';
+  bossAnnounceEl.querySelector('.boss-warn').textContent = '★ 威脅偵測 ★';
+  bossAnnounceEl.querySelector('.boss-title').textContent = entry.name;
+  bossAnnounceEl.querySelector('.boss-flavor').innerHTML = '巨大生物反應接近中，雜兵生產已停止。<br>迎擊！';
+  bossAnnounceEl.classList.remove('hidden');
+  const rid = gameRunId;
+  setTimeout(()=>{
+    if(rid!==gameRunId) return;
+    bossAnnounceEl.classList.add('hidden');
+    startBossBattle(entry);
+    proceedAfterMenus();
+  }, 1800);
 }
 function spawnFinalBoss(){
   const diff = getDifficulty(elapsed);
@@ -2251,7 +2551,7 @@ function resetGame(){
   player.suitTier='power'; player.invulTimer=0; player.reserveCharges=0; player.finalBossTriggered=false;
   enemies=[]; gems=[]; projectiles=[]; particles=[]; bombs=[]; novas=[]; mines=[]; pulses=[]; lightningFX=[]; blastRings=[];
   spawnTimer=0.6; elapsed=0; levelUpQueue=0; evolutionQueue=[]; pendingFinalBoss=false; bossSpawned={};
-  bossBattle=null; enemyProjectiles=[];
+  bossBattle=null; pendingMidBoss=null; enemyProjectiles=[];
 }
 
 function startGame(){
@@ -2293,6 +2593,8 @@ function updatePlayer(dt){
     if(mx!==0) player.facing = mx>0?1:-1;
     player.lastMoveAngle = Math.atan2(my,mx);
     player.walkPhase += dt*10;
+    // 腳邊揚塵，增加移動動感
+    if(Math.random() < dt*9){ spawnBurst(player.x - player.facing*5 + rand(-3,3), player.y + 20, '#9a7a55', 1, 34, 0.3); }
   }
   if(player.hp>player.maxHp) player.hp = player.maxHp;
 }
@@ -2316,10 +2618,18 @@ function update(dt){
   updateParticles(dt);
 
   if(player.hp<=0){ endGame(); return; }
+  // 中頭目公告（時間觸發或頭目連戰的下一場）
+  if(pendingMidBoss && state==='playing' && !bossBattle){
+    const e = pendingMidBoss; pendingMidBoss = null; showMidBossAnnouncement(e); return;
+  }
   // 保底機制：進化搭配選錯導致永遠湊不滿6把進化時，25分鐘強制觸發終極頭目
   if(!player.finalBossTriggered && elapsed>=1500){ player.finalBossTriggered=true; pendingFinalBoss=true; }
-  // 中頭目戰進行中先不放終極頭目（打完才觸發）
-  if(pendingFinalBoss && state==='playing' && !bossBattle){ pendingFinalBoss=false; showFinalBossAnnouncement(); return; }
+  // 終極頭目前的「頭目連戰」：還有中頭目沒打過就依序全部登場，全數擊破後QUEEN才現身
+  if(pendingFinalBoss && state==='playing' && !bossBattle && !pendingMidBoss){
+    const next = BOSS_TABLE.find(e=>!bossSpawned[e.t]);
+    if(next){ bossSpawned[next.t]=true; pendingMidBoss = next; return; }
+    pendingFinalBoss=false; showFinalBossAnnouncement(); return;
+  }
   if(levelUpQueue>0 && state==='playing'){ openLevelUp(); }
 }
 
