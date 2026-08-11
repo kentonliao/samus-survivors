@@ -188,7 +188,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = 'v1.4 · 2026-08-11 · 頭目高解析重繪＋血量大增＋威脅偵測公告＋頭目連戰';
+const GAME_VERSION = 'v1.5 · 2026-08-11 · 薩姆斯跑步動畫（SA-X取樣）＋頭目呼吸與前撲動作';
 const W = 960, H = 600;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -898,25 +898,428 @@ const SAMUS_ROWS = [
   "..WWOOOOW.....WWOOOOW.....",
 ];
 const SAMUS_WIDTH = 26;
+// SA-X sheet 取樣的10幀跑步循環（面向右，字母同動力服調色盤系統）
+const SAMUS_RUN_W = 31;
+const SAMUS_RUN_H = 37;
+const SAMUS_RUN_FRAMES = [
+  [
+    "...............................",
+    "..............RRRR.............",
+    "...........KKRRKRYR............",
+    "..........KROOYOKRRR...........",
+    ".........KROYRYYORGR...........",
+    ".........KROYRYYORGG...........",
+    "........GKRROROOORRG...........",
+    "........GKRKKKRRRRER...........",
+    "........GKKGGEEGKGRK...........",
+    "........KKNROOYRNRRR...........",
+    ".........KNKOYYYNRRRR..........",
+    ".........KKKROYYRKKRR.NNN......",
+    ".........KNKKROORKRKKNOYYN.....",
+    "..........KWOKRRNNRNNRORKNKNKK.",
+    "..........KKWKKKNEOYORORKENENEK",
+    "..........KKKWKROEKYYORKEENENEK",
+    "...........WRRKKOYKOORKKNNKNKNK",
+    "..........WOORRKKKRRKKKNNNKNKNK",
+    ".........WROYORWKKKKNKKKKKKKKK.",
+    ".........WOYYORWKRRW...........",
+    ".........WOYYORWKKRK...........",
+    ".........WOYYORWWKRK...........",
+    ".........WRYORKRWKRK...........",
+    ".........WRORRKRWORK...........",
+    ".........KOYOW.KWORKK..........",
+    ".........KOYOW.KRKKKRW.........",
+    ".......WWWRRW...KKKWRW.........",
+    ".....RRRORKKW...KKRROW.........",
+    "....ROYYYROK...KRRRKOW.........",
+    ".WWROOOOROOK...KROOKK..........",
+    "WOORROORKKK.....KRORK..........",
+    "WORWWKKKK........KRWK..........",
+    "WRROOK...........KRWOK.........",
+    "KOOKK............KKWOK.........",
+    "KRRK............KRWRRRWW.......",
+    ".KOORK..........KRRKWOORK......",
+    ".KKKKK..........KKKKKKKKK......",
+  ],
+  [
+    "...............................",
+    "..............RRRR.............",
+    "...........KKRRKRYR............",
+    "..........KROOYOKRRR...........",
+    ".........KROYRYYORGR...........",
+    ".........KROOROYORGG...........",
+    "........GKRRRRROORRG...........",
+    "........GKRKKKRRRRER...........",
+    "........GKKGGEEGKGRK...........",
+    "........KKNRROORNRRR...........",
+    ".........KNKROYYRKRRR..........",
+    ".........KKKRROYRKKRR.NNN......",
+    ".........KNKKROORKRKKNOYYN.....",
+    "..........KWOKRRNNRNNRORKNKNKK.",
+    "..........KKWKKKNEOYORORKENENEK",
+    "..........KKKWKROEKYYORKEENENEK",
+    "...........RRWKKOYKOOKKNNNKNKNK",
+    "..........WOORWKKKRRKKKNNNKNKNK",
+    "..........ROYORWKKKKNKKKKKKKKK.",
+    ".........ROYYORWWKRW...........",
+    ".........ROYYORWWKRRW..........",
+    ".........ROYOOWRWOKRW..........",
+    ".........WOOORWKWOWKRW.........",
+    ".........WRORW..KWOKOK.........",
+    ".........KYYOW..KRWKRK.........",
+    "........WKORK....KRKKRK........",
+    "......RRWRKK.....KWWROK........",
+    ".....ROOROOR....WRRRWOK........",
+    "....WOYYKRRW....WRORKR.........",
+    "....WOYOKKW.....KRRORK.........",
+    "...WROORK........KKRRK.........",
+    "..WORRKK.........KROKW.........",
+    ".WOOWWW..........KRWRW.........",
+    ".KOROOW..........KKWOK.........",
+    ".KKORW..........WRWRRRWW.......",
+    "...KOOWW........WRRWKOORK......",
+    "...KKKKK........WKKKKKKKK......",
+  ],
+  [
+    ".............RRRR..............",
+    "..........KKRRRRYR.............",
+    ".........KROOYORRRR............",
+    "........KROYRYYORGR............",
+    "........KRROROYORGG............",
+    ".......GKRRRRRRORRG............",
+    ".......GKRKKKGGRRER............",
+    ".......GKKGGEEGKGRK............",
+    ".......KKGRROORGRRR............",
+    "........KNKROYYNRRRR...........",
+    "........KKKKOYYRKKRR.NNN.......",
+    "........KNKKROYRKRKKNOYYN......",
+    ".........KWOKRRNNRNNRORKNKNKK..",
+    ".........KKWKKKNEOYORORKENENEK.",
+    ".........KKKWKROEKYYORKEENENEK.",
+    "..........KKKKKOYKOOKKNNNKNKNK.",
+    "..........KWRWKKKRRKKKNNNKNKNK.",
+    "..........WOORKKKKKNKKKKKKKKK..",
+    ".........WRYOORKRW.............",
+    ".........ROYYORWKRW............",
+    ".........ROYYORWWKRW...........",
+    ".........WOYYORWOKOW...........",
+    ".........WRORRKWOOKOW..........",
+    ".........KOYORKRKWKRW..........",
+    ".........KROOK.KKKKKOK.........",
+    "........WKRRK...KKOOOK.........",
+    "......RORRKKK..KRRWROK.........",
+    ".....ROOROOK...KRRWRK..........",
+    ".....RYYRORK...WRRRK...........",
+    "....WOYORRK....WWROK...........",
+    "....WOOWKK.....WRROKK..........",
+    "...WWRKK.......WWRWRK..........",
+    "...RWWOK......KRWKWOK..........",
+    "..WORORK......KRRKRKRKK........",
+    "..KOORWWK.....KKKRKROORK.......",
+    "..KKKROORK.......KKKKKKK.......",
+    "....KKKKKK.....................",
+  ],
+  [
+    "............RRRR...............",
+    ".........KKRRRRYR..............",
+    "........KROOYORRRR.............",
+    ".......KROYRYYORGR.............",
+    ".......KRROROYORGG.............",
+    "......GKRRRRRRORRG.............",
+    "......GKRKKKGGRRER.............",
+    "......GKKGGEEGKGRK.............",
+    "......KKGRROORGRRR.............",
+    ".......KNKROYYNRRRR............",
+    ".......KKKKOYYRKKRR.NNN........",
+    ".......KNKKROYRKRKKNOYYN.......",
+    "........KWOKRRNNRNNRORKNKNKK...",
+    "........KKWKKKNEOYORORKENENEK..",
+    "........KKKWKROEKYYORKEENENEK..",
+    ".........KKWKKOYKOOKKNNNKNKNK..",
+    ".........KWRRKKKRRKKKNNNKNKNK..",
+    ".........WOORRKKKKNKKKKKKKKK...",
+    "........WOYYORKRW..............",
+    "........KOYYORKRWW.............",
+    "........KOYYOWWKRW.............",
+    "........KRYORWOKOW.............",
+    ".......KWRRRWRWOKRW............",
+    ".......KRYOW.KKWKOW............",
+    ".......KOOWW.KKKKWK............",
+    "......WRKKW.WRWKWOK............",
+    "......KKOR.WRRRWROK............",
+    ".....RROYR.WRRRWRK.............",
+    "....ROOROR.WKRRKK..............",
+    "....RYYRR..WRRK................",
+    "....WOYR...KRWRK...............",
+    "....WROR..WRWWRK...............",
+    "....WRWOK.WRWROK...............",
+    "...WRWOOK.RRRWRRKK.............",
+    "...WORWWK.KKKRKOORK............",
+    "...WOKROOK...KKKKKK............",
+    "...KKKKKKK.....................",
+  ],
+  [
+    "...............................",
+    "...........RRRR................",
+    "........KKRRKRYR...............",
+    ".......KROOYOKRRR..............",
+    "......KROYRYYORGR..............",
+    "......KROYRYYORGG..............",
+    ".....GKRROROOORRG..............",
+    ".....GKRKKKRRRRER..............",
+    ".....GKKGGEEGKGRK..............",
+    ".....KKNROOYRNRRR..............",
+    "......KNKOYYYNRRRR.............",
+    "......KKKROYYRKKRR.NNN.........",
+    "......KNKKROORKRKKNOYYN........",
+    ".......KWOKRRNNRNNRORKNKNKK....",
+    ".......KKWKKKNEOYORORKENENEK...",
+    ".......KKKWKROEKYYORKEENENEK...",
+    "........WWRKKOYKOORKKNNKNKNK...",
+    ".......WRORRKKKRRKKKNNNKNKNK...",
+    "......KWOYORKRKKKNKKKKKKKKK....",
+    "......KOYYORKKRW...............",
+    "......KOYYORWKRW...............",
+    "......KROYOROKRW...............",
+    "......KRRORWOKRRW..............",
+    ".......WOYRKOWKRK..............",
+    ".......KYYWKWWKOK..............",
+    "......WRORWRWKKW...............",
+    "......WRKWRRRKROK..............",
+    ".....WKKWYWRKROK...............",
+    "....KROROOWWKKK................",
+    "....KRYYROWKK..................",
+    "....KWOYRWWK...................",
+    ".....KOOWRRK...................",
+    ".....KRRWRK....................",
+    ".....KKRWOWK...................",
+    "....KOOKOWRRR..................",
+    "....KOWOWROOK..................",
+    "....KKKKKKKKK..................",
+  ],
+  [
+    "...............................",
+    ".................RRRR..........",
+    "................RYRRRRR........",
+    "...............RRRRRGGGR.......",
+    "...............RGKRGRRRKK......",
+    "...............GGKGOOYORKK.....",
+    "...............GRROYRYRORKG....",
+    "...............REROORORRRKG....",
+    "...............KRRRRRGKKRKG....",
+    "...............RRRKNEENKKKK....",
+    "..............RRRRYORNKNKK.....",
+    "..............RRKOYYYKKKKK.....",
+    "..........RORRKKKOYYOKKKNK.....",
+    ".....KKNKRYRONNKKROORKOWK......",
+    "....KENENRRNREEKNKKRKOWKK......",
+    "....KENENEEENEEEKNRKKWKKK......",
+    "....KNKNKNNNNNEEKROKWRWW.......",
+    "....KNKNKNNNKNNNKORKRRORW......",
+    ".....KKKKKKKKKNKWKKKROYOWK.....",
+    "................WRKKROYYOK.....",
+    "................WRKWROYYOK.....",
+    "................WRKOROYORK.....",
+    "...............WRRKOWRORRK.....",
+    "...............KRKWOKRYOW......",
+    "...............KOKWWKWYYK......",
+    "................WKKWRWRORW.....",
+    "...............KORKRRRWKRW.....",
+    "................KORKRWYWKKW....",
+    ".................KKKWWOORORK...",
+    "...................KKWORYYRK...",
+    "....................KWWRYOWK...",
+    "....................KRRWOOK....",
+    ".....................KRWRRK....",
+    "....................KWOWRKK....",
+    "...................RRRWOKOOK...",
+    "...................KOORWOWOK...",
+    "...................KKKKKKKKK...",
+  ],
+  [
+    "................RRRR...........",
+    "...............RYRRRRR.........",
+    "..............RRRRRGGGR........",
+    "..............RGKRGRRRKK.......",
+    "..............GGKGOYYORKK......",
+    "..............GRROYRYRORKG.....",
+    "..............REROORRKRRKG.....",
+    "..............KRRRRGKKKRKG.....",
+    "..............RRRKGEEGKKKK.....",
+    ".............RRRRYORNKNKK......",
+    ".............RRKYYYOKKKKK......",
+    ".........RORRKKKOYORKKKNK......",
+    "....KKNKRYRONNKKRORRKOWK.......",
+    "...KENENRRNREEKNKKRKOWKK.......",
+    "...KENENEEENEEEKNRKKWKKK.......",
+    "...KNKNKNNNNNEEKROKWWKK........",
+    "...KNKNKNNNKNNNKORKRRWK........",
+    "....KKKKKKKKKNKWKKRROOW........",
+    "...............WRKROYYOW.......",
+    "..............WWRKROYYOK.......",
+    "..............WRKWWOYYOK.......",
+    "..............WOKOWROYRK.......",
+    ".............WRKOWRWRRRWK......",
+    ".............WOKWKK.WOYRK......",
+    ".............KWKKKK.WWOOK......",
+    ".............KOWKWRW.WKKRW.....",
+    ".............KORWRRRW.ROKK.....",
+    "..............KRWRRRW.RYORR....",
+    "...............KKRRKW.ROROOR...",
+    ".................KRRW..RRYYR...",
+    "................KRWRK...RYOW...",
+    "................KRWWRW..RORW...",
+    "................KORWRW.KOWRW...",
+    "..............KKRRWRRR.KOOWRW..",
+    ".............KROOKRKKK.KWWROW..",
+    ".............KKKKKK...KOORKOW..",
+    "......................KKKKKKK..",
+  ],
+  [
+    "...............RRRR............",
+    "..............RYRRRRR..........",
+    ".............RRRRRGGGR.........",
+    ".............RGKRGRRRKK........",
+    ".............GGKGOYYORKK.......",
+    ".............GRROYRYRORKG......",
+    ".............REROORRKRRKG......",
+    ".............KRRRRGKKKRKG......",
+    ".............RRRKGEEGKKKK......",
+    "............RRRRYORNKNKK.......",
+    "............RRKYYYOKKKKK.......",
+    "........RORRKKKOYORKKKNK.......",
+    "...KKNKRYRONNKKRORRKOWK........",
+    "..KENENRRNREEKNKKRKOWKK........",
+    "..KENENEEENEEEKNRKKWKKK........",
+    "..KNKNKNNNNNEEKROKWKKK.........",
+    "..KNKNKNNNKNNNKORKWRWK.........",
+    "...KKKKKKKKKNK.KKKROOW.........",
+    "..............WRKROOYRW........",
+    ".............WRKWROYYOR........",
+    "............WRKWWROYYOR........",
+    "............WOKOWROYYOW........",
+    "...........WOKOOWKRRORW........",
+    "...........WRKWKRKROYOK........",
+    "..........KOKKKKK.KOORK........",
+    "..........KOOOKK...KRRKW.......",
+    "..........KORWRRK..KKKRROR.....",
+    "...........KRWRRK...KOOROOR....",
+    "............KRRRW...KRORYYR....",
+    "............KORWW....KRROYOW...",
+    "...........KKORRW.....KKWOOW...",
+    "...........KRWRWW.......KKRWW..",
+    "...........KOWKWRK......KOWWR..",
+    ".........KKRKRKRRK......KROROW.",
+    "........KROORKRKKK.....KWWROOK.",
+    "........KKKKKKK.......KROORKKK.",
+    "......................KKKKKK...",
+  ],
+  [
+    "...............................",
+    "..............RRRR.............",
+    ".............RYRRRRR...........",
+    "............RRRRRGGGR..........",
+    "............RGKRGRRRKK.........",
+    "............GGKGOYYORKK........",
+    "............GRROYRYRORKG.......",
+    "............RERORRRKRRKG.......",
+    "............KRRRRKKKKRKG.......",
+    "............RRRKNEENKKKK.......",
+    "...........RRRRYYRNKNKK........",
+    "...........RRKYYOOKKKKK........",
+    ".......RORRKKKYOORKKKNK........",
+    "..KKNKRYRONNKKRORRKOWK.........",
+    ".KENENRRNREEKNKKRKOWKK.........",
+    ".KENENEEENEEEKNRKKWKKK.........",
+    ".KNKNKNNNNNEEKROKWWRR..........",
+    ".KNKNKNNNKNNNKORKWROOW.........",
+    "..KKKKKKKKKNKRKKWROYOR.........",
+    "............WRKWWROYYOR........",
+    "...........WRRKWWROYYOR........",
+    "...........WRKOWRWOOYOR........",
+    "..........WRKWOWKWROOOW........",
+    "..........KOKOWK..WRORW........",
+    "..........KRKWRK..WOYYK........",
+    ".........KRKKRK....KROKW.......",
+    ".........KORWWK.....KKRWRR.....",
+    ".........KOWRRRW....ROOROOR....",
+    "..........RKRORW....WRRKYYOW...",
+    "..........KRORRK.....WKKOYOW...",
+    "..........KRRKK........KROORW..",
+    "..........WKORK.........KKRROW.",
+    "..........WRWRK..........WWWOOW",
+    "..........KOWKK..........WOOROK",
+    "........WWRRRWRW..........WROKK",
+    ".......KROOKWRRW........WWOOK..",
+    ".......KKKKKKKKW........KKKKK..",
+  ],
+  [
+    "...............................",
+    ".............RRRR..............",
+    "............RYRRRRR............",
+    "...........RRRRRGGGR...........",
+    "...........RGKRGRRRKK..........",
+    "...........GGKGOOYORKK.........",
+    "...........GRROYRYRORKG........",
+    "...........REROORORRRKG........",
+    "...........KRRRRRGKKRKG........",
+    "...........RRRKNEENKKKK........",
+    "..........RRRRYORNKNKK.........",
+    "..........RRKOYYYKKKKK.........",
+    "......RORRKKKOYYOKKKNK.........",
+    ".KKNKRYRONNKKROORKOWK..........",
+    "KENENRRNREEKNKKRKOWKK..........",
+    "KENENEEENEEEKNRKKWKKK..........",
+    "KNKNKNNNNNEEKROKWRRW...........",
+    "KNKNKNNNKNNNKORKRROOW..........",
+    ".KKKKKKKKKNKWKKWROYORW.........",
+    "...........WRRKWROYYOW.........",
+    "...........KRKKWROYYOW.........",
+    "...........KRKWWROYYOW.........",
+    "...........KRKWRKROYRW.........",
+    "...........KROWRKRRORW.........",
+    "..........KKROWK.WOYOK.........",
+    ".........WRKKKRK.WOYOK.........",
+    ".........WRWKKK...WRRWWW.......",
+    ".........WORRKK...WKKRORRR.....",
+    ".........WOKRRRK...KORYYYOR....",
+    "..........KKOORK...KOOROOOORWW.",
+    "..........KRORK.....KKKROORROOW",
+    "..........KWRK........KKKKWWROW",
+    ".........KOWRK...........KOORRW",
+    ".........KOWKK............KKOOK",
+    ".......WWRRRWRK............KRRK",
+    "......KROOWKRRK..........KROOK.",
+    "......KKKKKKKKK..........KKKKK.",
+  ],
+];
 const SAMUS_UNIT = 1.05;
 const SAMUS_LEG_ROW = 32;
 const SAMUS_LEG_SPLIT = 13;
 
+const SAMUS_RUN_UNIT = (43 * 1.05) / 37; // 跑步幀(37列)畫面高度對齊站姿(43列x1.05)
 function drawSamus(ctx, cx, cy, palette, walkPhase, facing, invulFlicker){
   if(invulFlicker) return;
-  const rows = SAMUS_ROWS;
-  const u = SAMUS_UNIT;
-  const w = SAMUS_WIDTH*u, h = rows.length*u;
+  // 移動時使用 SA-X 取樣的10幀跑步循環；靜止時用站姿+呼吸
+  const moving = player.moving;
+  let rows, u, wCells;
+  if(moving){
+    const fi = Math.floor(walkPhase*1.5) % SAMUS_RUN_FRAMES.length;
+    rows = SAMUS_RUN_FRAMES[fi]; u = SAMUS_RUN_UNIT; wCells = SAMUS_RUN_W;
+  } else {
+    rows = SAMUS_ROWS; u = SAMUS_UNIT; wCells = SAMUS_WIDTH;
+  }
+  const w = wCells*u, h = rows.length*u;
   ctx.save();
-  // 動感：待機時輕微呼吸（squash&stretch），移動時朝行進方向前傾
-  const breathe = player.moving ? 1 : 1 + Math.sin(elapsed*2.6)*0.014;
-  const lean = player.moving ? 0.07*facing : 0;
+  // 動感：待機呼吸（squash&stretch，錨定腳底），移動時朝行進方向微前傾
+  const breathe = moving ? 1 : 1 + Math.sin(elapsed*2.2)*0.035;
+  const lean = moving ? 0.06*facing : 0;
   ctx.translate(cx, cy);
   ctx.rotate(lean);
+  ctx.translate(0, h/2);       // 呼吸以腳底為錨點，頭部起伏、腳不滑動
   ctx.scale(1, breathe);
-  ctx.translate(-w/2, -h/2);
+  ctx.translate(-w/2, -h);     // 讓矩陣底部貼齊腳底錨點
   if(facing < 0){ ctx.translate(w,0); ctx.scale(-1,1); }
-  const legOffset = Math.sin(walkPhase)*1.8;
   for(let r=0;r<rows.length;r++){
     const row = rows[r];
     for(let c=0;c<row.length;c++){
@@ -934,10 +1337,8 @@ function drawSamus(ctx, cx, cy, palette, walkPhase, facing, invulFlicker){
         case 'E': color = palette.joint; break;
         default: color = '#fff';
       }
-      let dy = 0;
-      if(r>=SAMUS_LEG_ROW){ dy = (c<SAMUS_LEG_SPLIT) ? legOffset : -legOffset; }
       ctx.fillStyle = color;
-      ctx.fillRect(c*u, r*u+dy, u+0.5, u+0.5);
+      ctx.fillRect(c*u, r*u, u+0.5, u+0.5);
     }
   }
   ctx.restore();
@@ -1942,6 +2343,7 @@ function updateBossBattle(dt){
   const b = bossBattle;
   if(!b) return;
   if(!enemies.includes(b)){ bossBattle = null; return; } // 已被擊殺
+  if(b.lungeT > 0) b.lungeT -= dt; // 攻擊前撲動作衰減
   // 進場滑入（必須在凍結檢查之前：若凍結能中斷進場，冰凍光束會把頭目永久卡在場外造成軟鎖）
   if(b.entering){
     const dir = Math.sign(b.targetX - b.x);
@@ -1957,7 +2359,7 @@ function updateBossBattle(dt){
     case 'KRAID': {
       // 腹部三連尖刺 + 頭頂落石
       if(b.attackTimer <= 0){
-        b.attackTimer = 2.3;
+        b.attackTimer = 2.3; b.lungeT = 0.25;
         for(let i=0;i<3;i++){
           const ang = bossAimAtPlayer(b, 0.14) ;
           fireEnemyProjectile({ type:'spike', x:b.x + fireDir*b.wpx*0.22, y:b.y - b.hpx*0.18 + i*b.hpx*0.16,
@@ -1978,7 +2380,7 @@ function updateBossBattle(dt){
       // 沿側邊上下移動 + 扇形火彈
       b.y = b.baseY + Math.sin(b.patternT*0.85) * H*0.2;
       if(b.attackTimer <= 0){
-        b.attackTimer = 2.7;
+        b.attackTimer = 2.7; b.lungeT = 0.25;
         const base = bossAimAtPlayer(b, 0);
         for(let i=-2;i<=2;i++){
           const ang = base + i*0.24;
@@ -2005,7 +2407,7 @@ function updateBossBattle(dt){
         b.alpha = Math.max(0.25, b.tpTimer/0.7); // 淡出
       }
       if(b.attackTimer <= 0 && b.alpha > 0.9){
-        b.attackTimer = 3.1;
+        b.attackTimer = 3.1; b.lungeT = 0.25;
         const n = 10;
         for(let i=0;i<n;i++){
           const ang = (Math.PI*2/n)*i + b.patternT;
@@ -2043,7 +2445,7 @@ function updateBossBattle(dt){
           spawnBurst(b.x, b.y, '#ff4040', 20, 180, 0.5);
         }
         if(b.attackTimer <= 0){
-          b.attackTimer = 2.4;
+          b.attackTimer = 2.4; b.lungeT = 0.25;
           for(let i=0;i<2;i++){
             const ang = bossAimAtPlayer(b, 0.1);
             fireEnemyProjectile({ type:'fire', x:b.x + fireDir*b.wpx*0.28, y:b.y - b.hpx*0.2,
@@ -2208,10 +2610,17 @@ function drawEnemies(){
       drawFinalBoss(ctx, 0, 0, elapsed, en.hitFlash);
     } else if(spr && en.giant){
       // 巨型頭目：側邊錨定、依 faceRight 翻面（素材面向左；截斷側貼齊畫面外）
+      // 動感：緩慢呼吸起伏（腳底錨定）＋攻擊瞬間朝戰場前撲
       if(en.alpha !== undefined && en.alpha < 1){ ctx.globalAlpha = en.alpha; }
+      const gw = spr.width*en.spriteScale, gh = spr.height*en.spriteScale;
+      const gBreathe = 1 + Math.sin(en.phase*0.45)*0.016;
+      let lunge = 0;
+      if(en.lungeT > 0){ lunge = Math.sin((0.25-en.lungeT)/0.25*Math.PI) * gw*0.045; }
+      ctx.translate((en.faceRight?1:-1)*lunge, gh/2);
+      ctx.scale(1, gBreathe);
+      ctx.translate(0, -gh/2);
       if(en.faceRight){ ctx.scale(-1,1); }
       ctx.imageSmoothingEnabled = false;
-      const gw = spr.width*en.spriteScale, gh = spr.height*en.spriteScale;
       ctx.drawImage(spr, -gw/2, -gh/2, gw, gh);
       ctx.globalAlpha = 1;
     } else if(spr){
@@ -2594,7 +3003,7 @@ function updatePlayer(dt){
     player.lastMoveAngle = Math.atan2(my,mx);
     player.walkPhase += dt*10;
     // 腳邊揚塵，增加移動動感
-    if(Math.random() < dt*9){ spawnBurst(player.x - player.facing*5 + rand(-3,3), player.y + 20, '#9a7a55', 1, 34, 0.3); }
+    if(Math.random() < dt*16){ spawnBurst(player.x - player.facing*6 + rand(-4,4), player.y + 20, '#c9b28a', 2, 52, 0.45); }
   }
   if(player.hp>player.maxHp) player.hp = player.maxHp;
 }
