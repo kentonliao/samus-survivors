@@ -188,7 +188,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = 'v1.1 · 2026-08-11 · 精英配色重製＋自爆警告＋終極頭目保底與效能修正';
+const GAME_VERSION = 'v1.2 · 2026-08-11 · 薩姆斯造型重製（圖鑑取樣，動力服變色保留）';
 const W = 960, H = 600;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -583,39 +583,53 @@ const SUITS = {
 };
 
 const SAMUS_ROWS = [
-  "..........KKKKKKK..........",
-  ".........KWRRRRRRK.........",
-  "........KKWWWRRRRRK........",
-  ".......KKRRWWWRRRRRK.......",
-  ".......KKRRRRWWRRRRRK......",
-  "......KRRRRRRRRWRRWWK......",
-  "......KRRRRGGGGGRRRGK......",
-  "....KKKRRRRGGGGGGGGGKKKKK..",
-  "...KKKKRRRRGGGGGGGGGKKKKK..",
-  "..KKOOKRRRRRGGGGGGGGKOOOOK.",
-  ".KKOOOOKKWWRRRRRGGRRKOOOOOK",
-  ".KKOOOOOOKEWWWRREERREKOOOOK",
-  "..KKOOOOKRKEEEERRREEKOOOOKK",
-  "...KOOOKKRKEEEERRRKKKOOOKK.",
-  "...KKKKOORKKKKKKKKKKRKKKK..",
-  "..KKOOOKKRRRRRRRRRRRKOOOOK.",
-  ".KKOOOKKKKYRRRRRRYKK.KOOOOK",
-  ".KKKKKK.KKYYRRRRYYKK..KOOOK",
-  "KKKKKKK..KYYYRRRYYKK.KKOOOK",
-  "KNNNNNKK..KYYYYYYKK..KOOOYK",
-  "KNNGNNKKKKKYYYYYYKKK.KOOOOK",
-  "KNNGNNKKKKKKYYYYKKKK..KKKK.",
-  ".KGGNKKKKOOKKYYKKOOOK......",
-  ".KKKKKKKOOOKKKKKKOOOKK.....",
-  ".KKKKKKOOOOYYKKYYOOOOKK....",
-  ".KKGNKKOOOOYKK.KYOOOOKKK...",
-  "..KKKOOKKOOK....KOOOKOOKK..",
-  "..KKOOOOOKOK....KOOKOOOOOK.",
-  "..KKKKKKKKKK....KKKKKKKKKK.",
+  ".........RRYRRRRR.........",
+  ".......RRRRYRRRRR.........",
+  "......RRROWOW..GGG........",
+  "......R.WYOYOWEGGG........",
+  ".......WOYOYYOOGG.........",
+  ".......WYYOYYOOWW.........",
+  ".......WYYWYOOOWR.........",
+  "....RR.WOYWYWOOWR.........",
+  "....RR.WWOWOWWWRRR........",
+  "....RR....WWGGGORR........",
+  "....RRR.NNENN..RRWW.......",
+  "....NWR.NN...WWRR.........",
+  "....NNNW..WOOWWW.WWWW.....",
+  ".....KKW.WOYYOOW..WWOW.N..",
+  ".........WOYYOOWNNOOYY.N.N",
+  ".........WOYYOOWNNOOYY.E.N",
+  ".........WWOOOWWNNNWOO.E.N",
+  "........WOWOOWWNNNNNWW.N.N",
+  "........OYYOO...NNNN...N.N",
+  "........OYYYYO...O........",
+  "........OYYYYOO.WOOW......",
+  "........WYYYYOOWWOOW......",
+  "........WWOOOWWWWOOW......",
+  "........WOYYOWWWWWOO......",
+  ".........WYYOWWWWWOOW.....",
+  ".........WYYOWW.WWWWW.....",
+  ".........WOOWWW.WWWW......",
+  "...........W........W.....",
+  ".........WWWWOO.WWWWO.....",
+  ".......WWWOWYOO.WWOWO.....",
+  "......WOOWOWYOOWWWWWW.....",
+  ".....WOYYOOWO.WWOWWW......",
+  "....WOOYYOOW.WWOOWW.......",
+  "....WOOYOOW..WWWWW........",
+  "....WWOOWW..WWWWW.........",
+  "...WWWWW....WWWW..........",
+  ".WW.WW......WWWWWW........",
+  "WOOW...O.....WWWWW........",
+  "WYYOOOOW......WOOW........",
+  "WOOOYYW....O.WOOO.........",
+  "WWOOWW.....WWWWWWW........",
+  "..WOYYWW.....WOOOOW.......",
+  "..WWOOOOW.....WWOOOOW.....",
 ];
-const SAMUS_WIDTH = 27;
-const SAMUS_UNIT = 1.55;
-const SAMUS_LEG_ROW = 22;
+const SAMUS_WIDTH = 26;
+const SAMUS_UNIT = 1.05;
+const SAMUS_LEG_ROW = 32;
 const SAMUS_LEG_SPLIT = 13;
 
 function drawSamus(ctx, cx, cy, palette, walkPhase, facing, invulFlicker){
