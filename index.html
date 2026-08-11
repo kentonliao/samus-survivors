@@ -188,7 +188,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = 'v1.7 · 2026-08-11 · 背景美化（俯視角地形）＋頭目血量成長曲線';
+const GAME_VERSION = 'v1.8 · 2026-08-11 · 武器與經驗晶石視覺重製（白熱核心＋暗描邊）';
 const W = 960, H = 600;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -2095,10 +2095,16 @@ function drawMines(){
     }
     const spikes=6; const baseR = m.pulling?9:6;
     const spin = m.pulling ? elapsed*10 : 0;
+    ctx.fillStyle = 'rgba(8,10,14,0.75)'; // 暗描邊（萊姆綠在苔蘚上不明顯）
+    ctx.beginPath();
+    for(let i=0;i<spikes*2;i++){ const rad=(i%2===0?baseR:baseR*0.45)+1.6; const a=(Math.PI/spikes)*i+spin; const px=Math.cos(a)*rad, py=Math.sin(a)*rad; if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
+    ctx.closePath(); ctx.fill();
     ctx.fillStyle = m.pulling ? '#e0c8ff' : (m.evolved?'#c8a0ff':'#a3e635');
     ctx.beginPath();
     for(let i=0;i<spikes*2;i++){ const rad=i%2===0?baseR:baseR*0.45; const a=(Math.PI/spikes)*i+spin; const px=Math.cos(a)*rad, py=Math.sin(a)*rad; if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
     ctx.closePath(); ctx.fill();
+    ctx.fillStyle = (Math.sin(elapsed*6+m.x)>0) ? '#fff' : '#ff5b3d'; // 警示燈交替閃爍
+    ctx.beginPath(); ctx.arc(0,0,2,0,Math.PI*2); ctx.fill();
     ctx.restore();
   }
 }
@@ -2129,9 +2135,13 @@ function updatePulses(dt){
 function drawPulses(){
   for(const p of pulses){
     const def = WEAPON_DEFS[p.weaponId];
-    ctx.save(); ctx.globalAlpha = clamp(1-p.radius/p.maxRadius,0,1)*0.7;
-    ctx.strokeStyle = p.evolved?def.evo.color:def.color; ctx.lineWidth=2.5;
-    ctx.beginPath(); ctx.arc(p.x,p.y,p.radius,0,Math.PI*2); ctx.stroke();
+    const fade = clamp(1-p.radius/p.maxRadius,0,1);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);
+    ctx.globalAlpha = fade*0.35; ctx.strokeStyle = p.evolved?def.evo.color:def.color; ctx.lineWidth=7; ctx.stroke();
+    ctx.globalAlpha = fade*0.85; ctx.lineWidth=3; ctx.stroke();
+    ctx.globalAlpha = fade*0.9; ctx.strokeStyle='#fff'; ctx.lineWidth=1.2;
+    ctx.beginPath(); ctx.arc(p.x,p.y,Math.max(0,p.radius-2.5),0,Math.PI*2); ctx.stroke();
     ctx.restore();
   }
   ctx.globalAlpha = 1;
@@ -2220,34 +2230,54 @@ function drawProjectiles(){
 
     if(p.evolved){ ctx.globalAlpha=0.3; ctx.beginPath(); ctx.arc(0,0,11,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1; }
 
+    // 可讀性設計：暗描邊→色暈→彩色體→白熱核心，任何背景上都清楚
+    const col = p.color||'#dffcff';
     if(p.isMissile){
-      ctx.beginPath();
-      ctx.moveTo(11,0); ctx.lineTo(-5,-5); ctx.lineTo(-2,0); ctx.lineTo(-5,5); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgba(255,180,80,0.55)';
+      ctx.fillStyle='rgba(8,12,16,0.8)';
+      ctx.beginPath(); ctx.moveTo(13,0); ctx.lineTo(-6,-6); ctx.lineTo(-3,0); ctx.lineTo(-6,6); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.moveTo(11,0); ctx.lineTo(-5,-4.6); ctx.lineTo(-2,0); ctx.lineTo(-5,4.6); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.fillRect(5,-1.2,5,2.4);
       const flick = 4+Math.sin(p.age*40)*3;
-      ctx.beginPath(); ctx.moveTo(-5,-3); ctx.lineTo(-14-flick,0); ctx.lineTo(-5,3); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,150,50,0.7)';
+      ctx.beginPath(); ctx.moveTo(-5,-3.4); ctx.lineTo(-15-flick,0); ctx.lineTo(-5,3.4); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,240,180,0.9)';
+      ctx.beginPath(); ctx.moveTo(-5,-1.6); ctx.lineTo(-9-flick*0.5,0); ctx.lineTo(-5,1.6); ctx.closePath(); ctx.fill();
     } else {
       const shape = p.shape || 'bolt';
       if(shape==='bolt'){
-        ctx.fillRect(-9,-2.2,18,4.4);
-        ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.fillRect(-9,-1,18,2);
+        ctx.globalAlpha=0.3; ctx.fillStyle=col; ctx.fillRect(-11,-3.6,22,7.2); ctx.globalAlpha=1;
+        ctx.fillStyle=col; ctx.fillRect(-9,-2.4,19,4.8);
+        ctx.fillStyle='#fff'; ctx.fillRect(-5,-1.1,15,2.2);
       } else if(shape==='shard'){
+        ctx.globalAlpha=0.3; ctx.fillStyle=col;
+        ctx.beginPath(); ctx.moveTo(13,0); ctx.lineTo(1,-7); ctx.lineTo(-10,0); ctx.lineTo(1,7); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha=1; ctx.fillStyle=col;
         ctx.beginPath(); ctx.moveTo(10,0); ctx.lineTo(1,-5); ctx.lineTo(-8,0); ctx.lineTo(1,5); ctx.closePath(); ctx.fill();
-        ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=1; ctx.stroke();
+        ctx.fillStyle='#fff';
+        ctx.beginPath(); ctx.moveTo(7,0); ctx.lineTo(1,-2.4); ctx.lineTo(-3,0); ctx.lineTo(1,2.4); ctx.closePath(); ctx.fill();
       } else if(shape==='ribbon'){
-        ctx.beginPath();
-        ctx.moveTo(-9,0);
-        ctx.quadraticCurveTo(-3,-7,5,0);
-        ctx.quadraticCurveTo(-3,7,-9,0);
-        ctx.fill();
+        ctx.globalAlpha=0.32; ctx.fillStyle=col;
+        ctx.beginPath(); ctx.moveTo(-11,0); ctx.quadraticCurveTo(-3,-9,7,0); ctx.quadraticCurveTo(-3,9,-11,0); ctx.fill();
+        ctx.globalAlpha=1; ctx.fillStyle=col;
+        ctx.beginPath(); ctx.moveTo(-9,0); ctx.quadraticCurveTo(-3,-7,5,0); ctx.quadraticCurveTo(-3,7,-9,0); ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,0.85)';
+        ctx.beginPath(); ctx.moveTo(-5,0); ctx.quadraticCurveTo(-2,-3,3,0); ctx.quadraticCurveTo(-2,3,-5,0); ctx.fill();
       } else if(shape==='star'){
         ctx.rotate(p.age*8);
         const sp=5;
+        ctx.globalAlpha=0.3; ctx.fillStyle=col;
+        ctx.beginPath();
+        for(let i=0;i<sp*2;i++){ const r=i%2===0?11:4.4; const a=(Math.PI/sp)*i; const px=Math.cos(a)*r, py=Math.sin(a)*r; if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
+        ctx.closePath(); ctx.fill();
+        ctx.globalAlpha=1; ctx.fillStyle=col;
         ctx.beginPath();
         for(let i=0;i<sp*2;i++){ const r=i%2===0?8:3.2; const a=(Math.PI/sp)*i; const px=Math.cos(a)*r, py=Math.sin(a)*r; if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
         ctx.closePath(); ctx.fill();
+        ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(0,0,2.6,0,Math.PI*2); ctx.fill();
       } else {
-        ctx.fillRect(-7,-2,14,4);
+        ctx.fillStyle=col; ctx.fillRect(-7,-2,14,4);
+        ctx.fillStyle='#fff'; ctx.fillRect(-4,-1,10,2);
       }
     }
     ctx.restore();
@@ -2261,9 +2291,15 @@ function drawContinuousBeams(){
     if(cat!=='beam_continuous'){ continue; }
     if(w.beamTarget){
       ctx.save();
-      ctx.strokeStyle = def.color; ctx.lineWidth=3;
-      ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur=10; ctx.globalAlpha=0.85;
-      ctx.beginPath(); ctx.moveTo(player.x,player.y); ctx.lineTo(w.beamTarget.x,w.beamTarget.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(player.x,player.y); ctx.lineTo(w.beamTarget.x,w.beamTarget.y);
+      ctx.globalAlpha=0.3; ctx.strokeStyle=def.color; ctx.lineWidth=9; ctx.stroke();
+      ctx.globalAlpha=0.9; ctx.lineWidth=4; ctx.stroke();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1.6; ctx.stroke();
+      // 命中點光斑
+      ctx.globalAlpha=0.5; ctx.fillStyle=def.color;
+      ctx.beginPath(); ctx.arc(w.beamTarget.x, w.beamTarget.y, 9+Math.sin(elapsed*20)*2, 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha=0.95; ctx.fillStyle='#fff';
+      ctx.beginPath(); ctx.arc(w.beamTarget.x, w.beamTarget.y, 3.5, 0, Math.PI*2); ctx.fill();
       ctx.restore();
     }
   }
@@ -2283,6 +2319,8 @@ function drawOrbitEffects(){
         ctx.save(); ctx.rotate(a);
         ctx.globalAlpha=0.55; ctx.fillStyle=color;
         ctx.beginPath(); ctx.moveTo(4,-3); ctx.lineTo(s.radius,-7); ctx.lineTo(s.radius,7); ctx.lineTo(4,3); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha=0.75; ctx.fillStyle='#fff';
+        ctx.beginPath(); ctx.moveTo(s.radius*0.4,-1.5); ctx.lineTo(s.radius,-3); ctx.lineTo(s.radius,3); ctx.lineTo(s.radius*0.4,1.5); ctx.closePath(); ctx.fill();
         ctx.restore();
       }
       ctx.globalAlpha=0.28; ctx.strokeStyle=color; ctx.lineWidth=1;
@@ -2297,6 +2335,8 @@ function drawOrbitEffects(){
         const bx=Math.cos(a)*s.radius, by=Math.sin(a)*s.radius;
         ctx.globalAlpha=0.65; ctx.fillStyle=color;
         ctx.beginPath(); ctx.arc(bx,by, w.evolved?10:8, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha=0.9; ctx.fillStyle='#fff';
+        ctx.beginPath(); ctx.arc(bx,by, w.evolved?4:3, 0, Math.PI*2); ctx.fill();
       }
       ctx.globalAlpha=0.1; ctx.fillStyle=color;
       ctx.beginPath(); ctx.arc(0,0,s.radius,0,Math.PI*2); ctx.fill();
@@ -2882,19 +2922,30 @@ function drawGems(){
     const bob = Math.sin(g.phase)*2;
     if(g.consolidator){
       ctx.save(); ctx.translate(g.x,g.y+bob); ctx.rotate(elapsed*3);
+      ctx.fillStyle = 'rgba(8,10,14,0.7)'; // 暗描邊
+      ctx.beginPath();
+      for(let i=0;i<8;i++){ const rad=(i%2===0?g.r:g.r*0.55)+2; const a=(Math.PI/4)*i; const px=Math.cos(a)*rad, py=Math.sin(a)*rad; if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
+      ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#ff2e4d';
       ctx.beginPath();
       for(let i=0;i<8;i++){ const rad=i%2===0?g.r:g.r*0.55; const a=(Math.PI/4)*i; const px=Math.cos(a)*rad, py=Math.sin(a)*rad; if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
       ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(0,0,g.r*0.3,0,Math.PI*2); ctx.fill(); // 白芯
       ctx.restore();
       ctx.save(); ctx.font="9px 'Press Start 2P'"; ctx.fillStyle='#fff'; ctx.textAlign='center';
       ctx.fillText('+'+g.value, g.x, g.y+bob-g.r-6);
       ctx.restore();
       continue;
     }
+    // 一般晶石：暖金色系（青綠背景上對比最強），暗描邊+白芯+輕微脈動
+    const gs = g.r*(1+Math.sin(g.phase*1.4)*0.1);
     ctx.save(); ctx.translate(g.x,g.y+bob); ctx.rotate(Math.PI/4);
-    ctx.fillStyle = g.value>1 ? '#ffe27a' : '#4fd8ff';
-    ctx.fillRect(-g.r,-g.r,g.r*2,g.r*2);
+    ctx.fillStyle = 'rgba(8,10,14,0.75)';
+    ctx.fillRect(-gs-1.5,-gs-1.5,gs*2+3,gs*2+3);
+    ctx.fillStyle = g.value>2 ? '#ffe27a' : '#ffb347';
+    ctx.fillRect(-gs,-gs,gs*2,gs*2);
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillRect(-gs*0.45,-gs*0.45,gs*0.9,gs*0.9);
     ctx.restore();
   }
 }
