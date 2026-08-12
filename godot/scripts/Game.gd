@@ -87,7 +87,7 @@ func difficulty(t: float) -> Array:
 		var a: Array = DIFF[i]
 		var b: Array = DIFF[i + 1]
 		if t >= a[0] and t <= b[0]:
-			var f := (t - a[0]) / (b[0] - a[0])
+			var f: float = (t - a[0]) / (b[0] - a[0])
 			return [lerpf(a[1], b[1], f), lerpf(a[2], b[2], f), lerpf(a[3], b[3], f), lerpf(a[4], b[4], f)]
 	return [1.0, 1.0, 1.0, 1.0]
 
