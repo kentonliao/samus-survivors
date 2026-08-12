@@ -3,12 +3,21 @@ extends Node2D
 ## 流暢度修正：改用 _process（每渲染幀更新，等同 HTML 版 rAF 方式）。
 ## 遊戲不用物理引擎碰撞（沿用 HTML 版的手動距離判定），所以不需要 _physics_process。
 
-const SPEED := 190.0
 const ARENA_MIN := Vector2(24, 24)
 const ARENA_MAX := Vector2(960 - 24, 540 - 24)
 
+var speed := 190.0
+var hp := 100.0
+var max_hp := 100.0
+var invul := 0.0
 var suit := "power"  # power / varia / gravity / hyper（之後由進化數驅動）
 var facing := 1
+
+func hurt(dmg: float) -> void:
+	if invul > 0.0:
+		return
+	hp -= dmg
+	invul = 0.6
 
 @onready var anim: AnimatedSprite2D = $Anim
 
@@ -40,8 +49,14 @@ func _process(delta: float) -> void:
 	if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):
 		dir.y += 1
 
+	if invul > 0.0:
+		invul -= delta
+		anim.visible = int(Time.get_ticks_msec() / 50.0) % 2 == 0  # 受擊閃爍
+	else:
+		anim.visible = true
+
 	if dir != Vector2.ZERO:
-		position += dir.normalized() * SPEED * delta
+		position += dir.normalized() * speed * delta
 		position = position.clamp(ARENA_MIN, ARENA_MAX)
 		if dir.x != 0:
 			facing = 1 if dir.x > 0 else -1
