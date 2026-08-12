@@ -613,9 +613,14 @@ func _tick_continuous_beam(w: WeaponInst, s: Stats, dt: float) -> void:
 		w.beam_target = null
 		return
 	if w.evolved and bool(evo.get("freeze", false)):
-		# 絕對零度射線：持續凍結目標（巨型頭目的freezeCd防永凍留待M4）
+		# 絕對零度射線：持續凍結目標；巨型頭目走 freeze_cd 防永凍
 		var e := w.beam_target
-		e.frozen_timer = maxf(e.frozen_timer, 0.35)
+		if e.giant:
+			if not (e.freeze_cd > 0.0) and not e.entering:
+				e.frozen_timer = 0.8
+				e.freeze_cd = 4.0
+		else:
+			e.frozen_timer = maxf(e.frozen_timer, 0.35)
 		if rng.randf() < dt * 14.0:
 			var jitter := Vector2(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0)) * e.radius * 0.6
 			fx.spawn_burst(e.position + jitter, Color("#bfeaff"), 1, 48.0, 0.4)
@@ -957,7 +962,13 @@ func _update_projectiles(dt: float) -> void:
 					e.speed_mult = maxf(0.25, e.speed_mult - p.slow)
 					e.slow_timer = 1.4
 				if p.freeze and was_alive and alive:
-					e.frozen_timer = 1.0
+					if e.giant:
+						# 巨型頭目防永凍：短凍結＋免疫冷卻（高射速冰束否則會讓頭目全程不能動）
+						if not (e.freeze_cd > 0.0) and not e.entering:
+							e.frozen_timer = 0.8
+							e.freeze_cd = 4.0
+					else:
+						e.frozen_timer = 1.0
 				if p.is_missile:
 					var radius := p.splash if p.splash > 0.0 else 34.0
 					fx.spawn_burst(p.pos, p.color, 24 if p.evolved else 10, 200.0 if p.evolved else 120.0, 0.6 if p.evolved else 0.35)

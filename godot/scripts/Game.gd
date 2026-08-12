@@ -40,16 +40,21 @@ var levelups_queued := 0
 var menu_open := false
 var dead := false
 var magnet_radius := 90.0
-var announce_time := 0.0          # 進化公告倒數（>0 時遊戲暫停）
+var announce_time := 0.0          # 公告倒數（>0 時遊戲暫停）
+var announce_action := ""         # 公告結束時的動作："" / midboss / queen
+var announce_entry := {}          # midboss 公告攜帶的 BOSS_TABLE 條目
 var banner_time := 0.0            # 動力服橫幅倒數
 var flash_time := 0.0             # 變身白閃倒數（刻意保留的慶祝特效）
 var evolution_queue: Array = []   # 待公告的 WeaponSystem.WeaponInst
-var final_boss_pending := false   # 6把全進化→M4 在此觸發 QUEEN METROID
+var final_boss_pending := false   # QUEEN 待觸發（6把全進化或25分保底）
+var final_boss_triggered := false # 只觸發一次
+var victorious := false
 
 var rng := RandomNumberGenerator.new()
 
 @onready var player: PlayerUnit = $Player
 var weapon_sys: WeaponSystem
+var boss_sys: BossSystem
 var fx: FxLayer
 var hud: CanvasLayer
 var hp_bar: ColorRect
@@ -69,6 +74,10 @@ var announce_desc: Label
 var flash_layer: CanvasLayer
 var flash_rect: ColorRect
 var dead_label: Label
+var boss_bar_name: Label
+var boss_bar_bg: ColorRect
+var boss_bar_fill: ColorRect
+var victory_label: Label
 
 
 func _ready() -> void:
@@ -83,6 +92,12 @@ func _ready() -> void:
 	weapon_sys.fx = fx
 	weapon_sys.z_index = 5   # 彈幕/光束畫在玩家之上
 	add_child(weapon_sys)
+	boss_sys = BossSystem.new()
+	boss_sys.game = self
+	boss_sys.player = player
+	boss_sys.fx = fx
+	boss_sys.z_index = 3     # 敵方彈幕：敵人之上、玩家之下
+	add_child(boss_sys)
 	weapon_sys.add_weapon("powerBeam")   # 初始武器
 	player.reserve_triggered.connect(_on_reserve_triggered)
 	_build_hud()
@@ -98,15 +113,23 @@ func _process(delta: float) -> void:
 		banner_time -= delta
 		if banner_time <= 0.0:
 			banner_label.visible = false
-	if dead:
+	if dead or victorious:
 		if Input.is_physical_key_pressed(KEY_R):
 			get_tree().reload_current_scene()
 		return
 	if announce_time > 0.0:
-		# 進化公告期間全場暫停
+		# 公告期間全場暫停（進化/頭目警告共用）
 		announce_time -= delta
 		if announce_time <= 0.0:
 			announce_layer.visible = false
+			var action := announce_action
+			announce_action = ""
+			match action:
+				"midboss":
+					boss_sys.start_boss_battle(announce_entry)
+					announce_entry = {}
+				"queen":
+					boss_sys.spawn_final_boss()
 			_proceed_after_menus()
 		return
 	if menu_open:
@@ -119,12 +142,34 @@ func _process(delta: float) -> void:
 	_update_spawning(delta)
 	_update_enemies(delta)
 	weapon_sys.tick(delta)
+	boss_sys.tick(delta)
 	_update_gems(delta)
 	fx.tick(delta)
 	_update_hud()
 	if player.hp <= 0.0:
 		_game_over()
-	elif levelups_queued > 0:
+		return
+	# ---- 頭目公告與連戰（HTML update() 同構）----
+	# 保底：進化搭配湊不滿6把時，25分鐘強制觸發 QUEEN
+	if not final_boss_triggered and elapsed >= 1500.0:
+		final_boss_triggered = true
+		final_boss_pending = true
+	if boss_sys.pending_mid_boss.size() > 0 and boss_sys.boss_battle == null:
+		var entry: Dictionary = boss_sys.pending_mid_boss
+		boss_sys.pending_mid_boss = {}
+		_show_boss_announce(String(entry["name"]), "巨大生物反應接近中，雜兵生產已停止。迎擊！", 3.0, "midboss", entry)
+		return
+	# 頭目連戰：QUEEN 觸發時若還有中頭目未登場，依序全部登場，全數擊破後 QUEEN 才現身
+	if final_boss_pending and boss_sys.boss_battle == null and boss_sys.pending_mid_boss.is_empty():
+		var next := boss_sys.next_unspawned()
+		if next.size() > 0:
+			boss_sys.boss_spawned[next["t"]] = true
+			boss_sys.pending_mid_boss = next
+			return
+		final_boss_pending = false
+		_show_boss_announce("QUEEN METROID", "動力服已完全覺醒，星球深處的最終威脅甦醒了。擊敗它，證明薩姆斯的極限。", 3.4, "queen", {})
+		return
+	if levelups_queued > 0:
 		_open_levelup()
 
 
@@ -145,6 +190,8 @@ func difficulty(t: float) -> Array:
 # ---------- 生成 ----------
 func _update_spawning(delta: float) -> void:
 	spawn_timer -= delta
+	if boss_sys.boss_battle != null:
+		return   # 頭目戰期間停止生產雜兵
 	var d := difficulty(elapsed)
 	if spawn_timer <= 0.0 and enemies.size() < MAX_ENEMIES:
 		spawn_timer = d[3]
@@ -214,62 +261,100 @@ func _update_enemies(delta: float) -> void:
 				e.speed_mult = 1.0
 		if e.freeze_cd > 0.0:
 			e.freeze_cd -= delta
+		var tint: Color
 		if e.hit_flash > 0.0:
 			e.hit_flash -= delta
-			e.spr.modulate = Color(2.2, 2.0, 1.4) if e.elite else Color(2.0, 2.0, 2.0)
+			tint = Color(2.2, 2.0, 1.4) if e.elite else Color(2.0, 2.0, 2.0)
 		elif e.frozen_timer > 0.0:
-			e.spr.modulate = Color(0.75, 1.05, 1.8)  # 冰凍藍
+			tint = Color(0.75, 1.05, 1.8)  # 冰凍藍
 		elif e.elite:
-			e.spr.modulate = Color(1.35, 1.15, 0.65)
+			tint = Color(1.35, 1.15, 0.65)
 		else:
-			e.spr.modulate = Color.WHITE
+			tint = Color.WHITE
+		tint.a = e.alpha   # Phantoon 淡出／死亡演出淡出
+		e.spr.modulate = tint
 		if e.frozen_timer > 0.0:
 			# 凍結：不移動、不接觸傷害（HTML同構）
 			e.frozen_timer -= delta
 			continue
-		var target := player.position
-		if e.flyer:
-			target += Vector2(sin(e.phase) * 30.0, cos(e.phase * 0.7) * 20.0)
-		var spd := e.spd * e.speed_mult
-		if e.dash:
-			e.dash_timer -= delta
-			if e.dash_timer <= 0.0:
-				spd *= 2.6
-				if e.dash_timer < -0.25:
-					e.dash_timer = rng.randf_range(1.5, 3.0)
-		var dir := (target - e.position)
-		if dir.length() > 1.0:
-			e.position += dir.normalized() * spd * delta
-			e.spr.flip_h = player.position.x > e.position.x
-		# 接觸傷害（減傷在 player.hurt 內套用）
-		if player.invul <= 0.0 and e.position.distance_to(player.position) < e.radius + 8.0:
+		if not e.giant:
+			# 巨型頭目的移動由 BossSystem 控制，不追玩家、不翻面
+			var target := player.position
+			if e.flyer:
+				target += Vector2(sin(e.phase) * 30.0, cos(e.phase * 0.7) * 20.0)
+			var spd := e.spd * e.speed_mult
+			if e.dash:
+				e.dash_timer -= delta
+				if e.dash_timer <= 0.0:
+					spd *= 2.6
+					if e.dash_timer < -0.25:
+						e.dash_timer = rng.randf_range(1.5, 3.0)
+			var dir := (target - e.position)
+			if dir.length() > 1.0:
+				e.position += dir.normalized() * spd * delta
+				e.spr.flip_h = player.position.x > e.position.x
+		# 接觸傷害（減傷在 player.hurt 內套用；死亡演出中關閉）
+		if e.dying <= 0.0 and player.invul <= 0.0 and e.position.distance_to(player.position) < e.radius + 8.0:
+			var dealt := e.dmg * (1.0 - player.dmg_reduction)
 			player.hurt(e.dmg)
+			if e.drain:
+				e.hp = minf(e.max_hp, e.hp + dealt * 2.5)   # Metroid幼體吸血回血
+			fx.spawn_burst(player.position, Color("#ff5b5b"), 10, 120.0, 0.35)
 
 
 func damage_enemy(e: EnemyUnit, dmg: float) -> void:
 	if e.dead:
 		return
+	if e.giant and (e.entering or e.dying > 0.0):
+		return   # 巨型頭目進場中無敵；死亡演出中不再受擊
 	e.hp -= dmg
 	e.hit_flash = 0.15
 	if e.hp <= 0.0:
+		if e.giant:
+			e.hp = 0.0
+			e.dying = 1.6   # 進入死亡演出（BossSystem 驅動，結束後才移除）
+			return
 		var idx := enemies.find(e)
 		if idx >= 0:
-			_kill_enemy(idx)
+			kill_enemy(idx)
 
 
-func _kill_enemy(idx: int) -> void:
+func kill_enemy(idx: int) -> void:
 	var e := enemies[idx]
 	if e.dead:
 		return
 	e.dead = true
 	enemies.remove_at(idx)  # 先移除再做死亡效果：防自爆蟲互殺無限遞迴（HTML v0.9教訓）
-	fx.spawn_burst(e.position, Color("#c58bff") if e.flyer else Color("#ffd76a"), 10, 140.0, 0.4)
+	if e == boss_sys.boss_battle:
+		# 頭目戰結束：清空敵方彈幕、恢復雜兵生產
+		boss_sys.boss_battle = null
+		boss_sys.enemy_projectiles.clear()
+	fx.spawn_burst(e.position, Color("#ffe066") if e.is_boss else (Color("#c58bff") if e.flyer else Color("#ffd76a")), 60 if e.is_boss else 10, 260.0 if e.is_boss else 140.0, 0.9 if e.is_boss else 0.4)
+	if e.is_final_boss:
+		fx.spawn_burst(e.position, Color("#1e9628"), 80, 300.0, 1.2)
+		fx.spawn_burst(e.position, Color.WHITE, 50, 260.0, 1.0)
+		e.queue_free()
+		_trigger_victory()
+		return
 	if e.explode:
 		for other: EnemyUnit in enemies.duplicate():
 			if is_instance_valid(other) and not other.dead and other.position.distance_to(e.position) < 60.0:
 				damage_enemy(other, 14.0)
 		if player.invul <= 0.0 and e.position.distance_to(player.position) < 60.0:
 			player.hurt(10.0)
+	if e.is_boss:
+		# 巨型頭目：14顆結晶（位置夾回場內），不走整合結晶（維持慶祝感）
+		var total := 150.0
+		for i in range(14):
+			var g := GemPickup.new()
+			g.setup(ceilf(total / 14.0), 7.0, false)
+			g.position = Vector2(
+				clampf(e.position.x + rng.randf_range(-40.0, 40.0), 30.0, W - 30.0),
+				clampf(e.position.y + rng.randf_range(-40.0, 40.0), 30.0, H - 30.0))
+			add_child(g)
+			gems.append(g)
+		e.queue_free()
+		return
 	var gv := 6.0 if e.elite else (3.0 if e.flyer else 2.0)
 	if gems.size() >= GEM_CAP:
 		var consol: GemPickup = null
@@ -410,14 +495,36 @@ func _check_suit_tier() -> void:
 		flash_time = 0.6   # 變身白閃：刻意保留的稀有慶祝特效（設計決策）
 		flash_rect.visible = true
 		_show_banner(String(SUIT_LABELS[tier]) + " 起動！")
-	if cnt >= 6 and not final_boss_pending:
-		final_boss_pending = true   # M4：QUEEN METROID 頭目戰在此觸發
+	if cnt >= 6 and not final_boss_triggered:
+		final_boss_triggered = true
+		final_boss_pending = true   # QUEEN METROID（含頭目連戰）由 _process 消化
 
 
 func _show_banner(text: String) -> void:
 	banner_label.text = text
 	banner_label.visible = true
 	banner_time = 1.8
+
+
+func _show_boss_announce(title: String, flavor: String, duration: float, action: String, entry: Dictionary) -> void:
+	announce_warn.text = "★ 威脅偵測 ★"
+	announce_warn.add_theme_color_override("font_color", Color("#ff4040"))
+	announce_name.text = title
+	announce_desc.text = flavor
+	announce_layer.visible = true
+	announce_time = duration
+	announce_action = action
+	announce_entry = entry
+	player.set_process(false)
+
+
+func _trigger_victory() -> void:
+	victorious = true
+	var m := int(elapsed) / 60
+	var s := int(elapsed) % 60
+	victory_label.text = "MISSION COMPLETE\n\n存活 %02d:%02d｜LV %d｜%s\n\n按 R 再次挑戰" % [m, s, level, String(SUIT_LABELS[player.suit])]
+	victory_label.visible = true
+	player.set_process(false)
 
 
 # ---------- HUD ----------
@@ -449,6 +556,27 @@ func _build_hud() -> void:
 	timer_label.position = Vector2(W - 100, 10)
 	timer_label.add_theme_font_size_override("font_size", 22)
 	hud.add_child(timer_label)
+	# 巨型頭目：畫面頂部大血條＋名稱
+	boss_bar_name = Label.new()
+	boss_bar_name.position = Vector2(0, 2)
+	boss_bar_name.size = Vector2(W, 20)
+	boss_bar_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	boss_bar_name.add_theme_font_size_override("font_size", 15)
+	boss_bar_name.add_theme_color_override("font_color", Color("#ffe066"))
+	boss_bar_name.visible = false
+	hud.add_child(boss_bar_name)
+	boss_bar_bg = ColorRect.new()
+	boss_bar_bg.position = Vector2(W / 2 - 192, 24)
+	boss_bar_bg.size = Vector2(384, 14)
+	boss_bar_bg.color = Color(0, 0, 0, 0.65)
+	boss_bar_bg.visible = false
+	hud.add_child(boss_bar_bg)
+	boss_bar_fill = ColorRect.new()
+	boss_bar_fill.position = Vector2(W / 2 - 190, 26)
+	boss_bar_fill.size = Vector2(380, 10)
+	boss_bar_fill.color = Color("#ffe066")
+	boss_bar_fill.visible = false
+	hud.add_child(boss_bar_fill)
 	lv_label = Label.new()
 	lv_label.position = Vector2(W / 2 - 30, H - 50)
 	hud.add_child(lv_label)
@@ -531,6 +659,14 @@ func _build_hud() -> void:
 	dead_label.position = Vector2(W / 2 - 220, H / 2 - 70)
 	dead_label.visible = false
 	hud.add_child(dead_label)
+	# 勝利畫面
+	victory_label = Label.new()
+	victory_label.add_theme_font_size_override("font_size", 30)
+	victory_label.add_theme_color_override("font_color", Color("#ffe066"))
+	victory_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	victory_label.position = Vector2(W / 2 - 260, H / 2 - 80)
+	victory_label.visible = false
+	hud.add_child(victory_label)
 
 
 func _refresh_slots() -> void:
@@ -561,6 +697,16 @@ func _update_hud() -> void:
 	timer_label.text = "%02d:%02d" % [m, s]
 	lv_label.text = "LV. %d" % level
 	xp_bar.size.x = 420.0 * clampf(xp / xp_next, 0.0, 1.0)
+	# 頂部頭目血條
+	var b := boss_sys.boss_battle
+	var show_bar := b != null and is_instance_valid(b) and not b.dead
+	boss_bar_name.visible = show_bar
+	boss_bar_bg.visible = show_bar
+	boss_bar_fill.visible = show_bar
+	if show_bar:
+		boss_bar_name.text = b.boss_name
+		boss_bar_fill.size.x = 380.0 * clampf(b.hp / b.max_hp, 0.0, 1.0)
+		boss_bar_fill.color = Color("#1e9628") if b.is_final_boss else Color("#ffe066")
 
 
 func _game_over() -> void:

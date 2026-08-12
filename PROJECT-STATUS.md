@@ -445,9 +445,27 @@
   ③ 玩家編輯器顯示16行錯誤＝stale快取假錯誤（行號與--import前完全一致）：
   **Claude在玩家編輯器開著時新增class_name檔案，編輯器記憶體快取不會自動更新，
   需「專案→重新載入目前專案」清除**；遊戲實際可跑即為佐證。
-  **下一步 M4**：頭目戰（4巨型中頭目+QUEEN：進場/攻擊模式/死亡演出/連戰/截斷側貼邊
-  照搬HTML；`final_boss_pending`旗標已就位，6把全進化時觸發）。
+  **M4 完成（2026-08-12，自動化驗證全過，待玩家實玩驗收）**：頭目戰移植——
+  ① `BossSystem.gd`：BOSS_TABLE（KRAID 5分/CROCOMIRE 10分/PHANTOON 15分/RIDLEY 20分，
+  血量隨難度超線性放大 hp×max(1,diff.hp/2.8)^1.6）；進場滑入（170px/s、進場無敵）、
+  截斷側貼邊（左側登場翻面）、呼吸起伏（腳底錨定）＋攻擊前撲＋死亡演出
+  （1.6秒連環爆炸+震動+淡出+終場白爆）；四頭目專屬攻擊照搬（KRAID尖刺+落石、
+  CROCOMIRE巡弋+扇形火彈、PHANTOON瞬移淡出換邊+環形幽靈彈、RIDLEY紅色預警+720px/s
+  俯衝橫掃+換邊重進場）；QUEEN（頂部降臨2.1倍、酸液扇射+全場衝擊波環+產卵Metroid
+  幼體2隻/6秒上限6）；Metroid幼體（飛行接觸吸血2.5倍回血、可凍結）；
+  敵方彈幕6型（spike/rock/fire/ghost/acid/shock）純資料陣列+統一繪製，上限90；
+  ② Game整合：頭目戰停產雜兵、威脅偵測公告（3.0s/QUEEN 3.4s）、頭目連戰
+  （QUEEN觸發時未登場中頭目依序全部登場）、25分保底、頂部大血條、
+  巨型頭目進場/死亡無敵、hp歸零轉死亡演出、14顆結晶（不走整合結晶）、
+  MISSION COMPLETE勝利畫面（R重開）；③ WeaponSystem：冰凍對巨型頭目
+  改0.8秒短凍結+4秒免疫冷卻（防永凍軟鎖，HTML v1.4教訓照搬）。
+  **驗證**：`godot/tests/m4_smoke.gd`（headless+有窗各一輪）：五頭目依序登場→
+  攻擊模式旗標全收（6彈型+瞬移淡出+俯衝+死亡演出+幼體+結晶）→勝利畫面，零錯誤。
+  **下一步 M5**：UI/音效（SM風格Theme、像素卡片/公告、8-bit音效wav化、
+  變身cut-in動畫=待辦11、2D Glow/畫面震動）。
   HTML 版此後只修bug不加功能。開發循環：Claude寫檔→玩家Godot按F5→回報。
+  **提醒玩家**：Claude新增了class_name檔案（BossSystem.gd），開著的編輯器需
+  「專案→重新載入目前專案」清除stale錯誤。
   **v1.9.2（第二十一輪）**：①絕對零度改為持續射線（evo加category:'beam_continuous'+range:300，
   weaponStats以damage×2.4換算dps，tickContinuousBeam持續凍結目標、巨型頭目走freezeCd防永凍；
   射線用進化冰藍色+白芯）；被凍結敵人蓋透明藍圓形標示（drawEnemies）
