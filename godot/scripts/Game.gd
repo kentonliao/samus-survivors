@@ -1,5 +1,7 @@
+class_name Game
 extends Node2D
-## M2 主控制器：時間/難度曲線/敵人生成/經驗/升級選單/HUD
+## M3 主控制器：時間/難度曲線/敵人生成/經驗/HUD ＋ 完整武器系統整合
+## （升級抽卡6+6欄位、12進化、進化公告、動力服自動變色）
 ## 中央迴圈驅動所有實體陣列（HTML版同構移植）
 
 const W := 960.0
@@ -7,7 +9,10 @@ const H := 540.0
 const MAX_ENEMIES := 600
 const GEM_CAP := 45
 
-# id: [introduceAt, hp, dmg, spd, r, weight, flyer, dash, explode, color_hint]
+const SUIT_LABELS := {"power": "POWER SUIT", "varia": "VARIA SUIT", "gravity": "GRAVITY SUIT", "hyper": "HYPER MODE"}
+const SUIT_HIGHLIGHT := {"power": "#eef30c", "varia": "#ffcf3d", "gravity": "#4fd8ff", "hyper": "#ffffff"}
+
+# id: [introduceAt, hp, dmg, spd, r, weight, flyer, dash, explode]
 const ENEMY_TYPES := {
 	"zeela":  [0.0,   16.0, 9.0,  70.0,  13.0, 3.0, false, false, false],
 	"skree":  [0.0,   10.0, 6.0,  112.0, 11.0, 2.0, true,  false, false],
@@ -28,7 +33,6 @@ var elapsed := 0.0
 var spawn_timer := 0.6
 var enemies: Array[EnemyUnit] = []
 var gems: Array[GemPickup] = []
-var bolts: Array[BoltShot] = []
 var xp := 0.0
 var level := 1
 var xp_next := 10.0
@@ -36,47 +40,93 @@ var levelups_queued := 0
 var menu_open := false
 var dead := false
 var magnet_radius := 90.0
-# M2 佔位武器：力量光束
-var fire_timer := 0.0
-var wpn_dmg := 8.0
-var wpn_cd := 0.42
-var wpn_count := 1
+var announce_time := 0.0          # 進化公告倒數（>0 時遊戲暫停）
+var banner_time := 0.0            # 動力服橫幅倒數
+var flash_time := 0.0             # 變身白閃倒數（刻意保留的慶祝特效）
+var evolution_queue: Array = []   # 待公告的 WeaponSystem.WeaponInst
+var final_boss_pending := false   # 6把全進化→M4 在此觸發 QUEEN METROID
 
 var rng := RandomNumberGenerator.new()
 
-@onready var player: Node2D = $Player
+@onready var player: PlayerUnit = $Player
+var weapon_sys: WeaponSystem
+var fx: FxLayer
 var hud: CanvasLayer
 var hp_bar: ColorRect
 var hp_label: Label
 var timer_label: Label
 var lv_label: Label
 var xp_bar: ColorRect
+var weapon_slots_label: Label
+var passive_slots_label: Label
+var banner_label: Label
 var menu_layer: CanvasLayer
 var menu_box: VBoxContainer
+var announce_layer: CanvasLayer
+var announce_warn: Label
+var announce_name: Label
+var announce_desc: Label
+var flash_layer: CanvasLayer
+var flash_rect: ColorRect
 var dead_label: Label
+
 
 func _ready() -> void:
 	rng.randomize()
+	player.z_index = 4       # 敵人(0)之上、彈幕層之下
+	fx = FxLayer.new()
+	fx.z_index = 6           # 粒子最上層
+	add_child(fx)
+	weapon_sys = WeaponSystem.new()
+	weapon_sys.game = self
+	weapon_sys.player = player
+	weapon_sys.fx = fx
+	weapon_sys.z_index = 5   # 彈幕/光束畫在玩家之上
+	add_child(weapon_sys)
+	weapon_sys.add_weapon("powerBeam")   # 初始武器
+	player.reserve_triggered.connect(_on_reserve_triggered)
 	_build_hud()
+	_refresh_slots()
+
 
 func _process(delta: float) -> void:
+	if flash_time > 0.0:
+		flash_time -= delta
+		flash_rect.modulate.a = clampf(flash_time / 0.6, 0.0, 1.0) * 0.9
+		flash_rect.visible = flash_time > 0.0
+	if banner_time > 0.0:
+		banner_time -= delta
+		if banner_time <= 0.0:
+			banner_label.visible = false
 	if dead:
 		if Input.is_physical_key_pressed(KEY_R):
 			get_tree().reload_current_scene()
 		return
+	if announce_time > 0.0:
+		# 進化公告期間全場暫停
+		announce_time -= delta
+		if announce_time <= 0.0:
+			announce_layer.visible = false
+			_proceed_after_menus()
+		return
 	if menu_open:
 		return
 	elapsed += delta
+	weapon_sys.refresh_mods()
+	player.speed = 190.0 * weapon_sys.mods.speed_mult
+	player.dmg_reduction = weapon_sys.mods.suit_dmg_reduction
+	magnet_radius = 90.0 * weapon_sys.mods.magnet_mult
 	_update_spawning(delta)
 	_update_enemies(delta)
-	_update_weapon(delta)
-	_update_bolts(delta)
+	weapon_sys.tick(delta)
 	_update_gems(delta)
+	fx.tick(delta)
 	_update_hud()
 	if player.hp <= 0.0:
 		_game_over()
 	elif levelups_queued > 0:
 		_open_levelup()
+
 
 # ---------- 難度 ----------
 func difficulty(t: float) -> Array:
@@ -91,6 +141,7 @@ func difficulty(t: float) -> Array:
 			return [lerpf(a[1], b[1], f), lerpf(a[2], b[2], f), lerpf(a[3], b[3], f), lerpf(a[4], b[4], f)]
 	return [1.0, 1.0, 1.0, 1.0]
 
+
 # ---------- 生成 ----------
 func _update_spawning(delta: float) -> void:
 	spawn_timer -= delta
@@ -99,8 +150,10 @@ func _update_spawning(delta: float) -> void:
 		spawn_timer = d[3]
 		var batch := 1 + int(elapsed / 130.0)
 		for i in range(mini(batch, 9)):
-			if enemies.size() >= MAX_ENEMIES: break
+			if enemies.size() >= MAX_ENEMIES:
+				break
 			_spawn_enemy(d)
+
 
 func _spawn_enemy(d: Array) -> void:
 	var pool: Array = []
@@ -149,20 +202,35 @@ func _spawn_enemy(d: Array) -> void:
 	add_child(e)
 	enemies.append(e)
 
+
 # ---------- 敵人行為 ----------
 func _update_enemies(delta: float) -> void:
 	for i in range(enemies.size() - 1, -1, -1):
 		var e := enemies[i]
 		e.phase += delta * 4.0
+		if e.slow_timer > 0.0:
+			e.slow_timer -= delta
+			if e.slow_timer <= 0.0:
+				e.speed_mult = 1.0
+		if e.freeze_cd > 0.0:
+			e.freeze_cd -= delta
 		if e.hit_flash > 0.0:
 			e.hit_flash -= delta
-			e.spr.modulate = Color(2.0, 2.0, 2.0) if not e.elite else Color(2.2, 2.0, 1.4)
+			e.spr.modulate = Color(2.2, 2.0, 1.4) if e.elite else Color(2.0, 2.0, 2.0)
+		elif e.frozen_timer > 0.0:
+			e.spr.modulate = Color(0.75, 1.05, 1.8)  # 冰凍藍
+		elif e.elite:
+			e.spr.modulate = Color(1.35, 1.15, 0.65)
 		else:
-			e.spr.modulate = Color(1.35, 1.15, 0.65) if e.elite else Color.WHITE
+			e.spr.modulate = Color.WHITE
+		if e.frozen_timer > 0.0:
+			# 凍結：不移動、不接觸傷害（HTML同構）
+			e.frozen_timer -= delta
+			continue
 		var target := player.position
 		if e.flyer:
 			target += Vector2(sin(e.phase) * 30.0, cos(e.phase * 0.7) * 20.0)
-		var spd := e.spd
+		var spd := e.spd * e.speed_mult
 		if e.dash:
 			e.dash_timer -= delta
 			if e.dash_timer <= 0.0:
@@ -173,17 +241,33 @@ func _update_enemies(delta: float) -> void:
 		if dir.length() > 1.0:
 			e.position += dir.normalized() * spd * delta
 			e.spr.flip_h = player.position.x > e.position.x
-		# 接觸傷害
+		# 接觸傷害（減傷在 player.hurt 內套用）
 		if player.invul <= 0.0 and e.position.distance_to(player.position) < e.radius + 8.0:
 			player.hurt(e.dmg)
 
+
+func damage_enemy(e: EnemyUnit, dmg: float) -> void:
+	if e.dead:
+		return
+	e.hp -= dmg
+	e.hit_flash = 0.15
+	if e.hp <= 0.0:
+		var idx := enemies.find(e)
+		if idx >= 0:
+			_kill_enemy(idx)
+
+
 func _kill_enemy(idx: int) -> void:
 	var e := enemies[idx]
-	enemies.remove_at(idx)
+	if e.dead:
+		return
+	e.dead = true
+	enemies.remove_at(idx)  # 先移除再做死亡效果：防自爆蟲互殺無限遞迴（HTML v0.9教訓）
+	fx.spawn_burst(e.position, Color("#c58bff") if e.flyer else Color("#ffd76a"), 10, 140.0, 0.4)
 	if e.explode:
-		for other in enemies:
-			if other.position.distance_to(e.position) < 60.0:
-				_damage(other, 14.0)
+		for other: EnemyUnit in enemies.duplicate():
+			if is_instance_valid(other) and not other.dead and other.position.distance_to(e.position) < 60.0:
+				damage_enemy(other, 14.0)
 		if player.invul <= 0.0 and e.position.distance_to(player.position) < 60.0:
 			player.hurt(10.0)
 	var gv := 6.0 if e.elite else (3.0 if e.flyer else 2.0)
@@ -211,60 +295,6 @@ func _kill_enemy(idx: int) -> void:
 		gems.append(g)
 	e.queue_free()
 
-func _damage(e: EnemyUnit, dmg: float) -> void:
-	e.hp -= dmg
-	e.hit_flash = 0.15
-	if e.hp <= 0.0:
-		var idx := enemies.find(e)
-		if idx >= 0:
-			_kill_enemy(idx)
-
-# ---------- 佔位武器：力量光束 ----------
-func _update_weapon(delta: float) -> void:
-	fire_timer -= delta
-	if fire_timer <= 0.0 and enemies.size() > 0:
-		fire_timer = wpn_cd
-		var nearest: EnemyUnit = null
-		var best := INF
-		for e in enemies:
-			var dd := e.position.distance_squared_to(player.position)
-			if dd < best:
-				best = dd
-				nearest = e
-		if nearest == null:
-			return
-		var base_ang := (nearest.position - player.position).angle()
-		for i in range(wpn_count):
-			var ang := base_ang + (i - (wpn_count - 1) / 2.0) * 0.16
-			var b := BoltShot.new()
-			b.position = player.position
-			b.vx = cos(ang) * 520.0
-			b.vy = sin(ang) * 520.0
-			b.dmg = wpn_dmg
-			b.rotation = ang
-			add_child(b)
-			bolts.append(b)
-
-func _update_bolts(delta: float) -> void:
-	for i in range(bolts.size() - 1, -1, -1):
-		var b := bolts[i]
-		b.age += delta
-		b.life -= delta
-		b.position += Vector2(b.vx, b.vy) * delta
-		b.queue_redraw()
-		var out := b.life <= 0.0 or b.position.x < -20 or b.position.x > W + 20 or b.position.y < -20 or b.position.y > H + 20
-		var used := false
-		if not out:
-			for e in enemies:
-				if e.position.distance_to(b.position) < e.radius + 4.0:
-					_damage(e, b.dmg)
-					b.pierce -= 1
-					if b.pierce <= 0:
-						used = true
-					break
-		if out or used:
-			bolts.remove_at(i)
-			b.queue_free()
 
 # ---------- 晶石 ----------
 func _update_gems(delta: float) -> void:
@@ -285,9 +315,6 @@ func _update_gems(delta: float) -> void:
 			gems.remove_at(i)
 			g.queue_free()
 
-func _up_hp() -> void:
-	player.max_hp += 20.0
-	player.hp = player.max_hp
 
 func _gain_xp(v: float) -> void:
 	xp += v
@@ -297,38 +324,101 @@ func _gain_xp(v: float) -> void:
 		xp_next = 6.0 + level * 3.2
 		levelups_queued += 1
 
-# ---------- 升級選單（M2文字卡佔位） ----------
+
+func _on_reserve_triggered() -> void:
+	fx.spawn_burst(player.position, Color("#4fd8ff"), 40, 220.0, 0.8)
+
+
+# ---------- 升級抽卡（6+6欄位、四種卡） ----------
 func _open_levelup() -> void:
+	var pool := weapon_sys.build_card_pool()
+	if pool.is_empty():
+		# 全欄位滿級：直接清空佇列，不顯示空選單卡住玩家（HTML v0.9教訓）
+		levelups_queued = 0
+		return
 	levelups_queued -= 1
 	menu_open = true
 	player.set_process(false)
-	var pool := [
-		["光束傷害 +25%", func(): wpn_dmg *= 1.25],
-		["射速 +15%", func(): wpn_cd = maxf(0.12, wpn_cd * 0.87)],
-		["移動速度 +10%", func(): player.speed *= 1.1],
-		["能量上限 +20（回滿）", _up_hp],
-		["磁吸範圍 +25%", func(): magnet_radius *= 1.25],
-		["光束 +1 發", func(): wpn_count += 1],
-	]
 	pool.shuffle()
 	for c in menu_box.get_children():
 		c.queue_free()
 	var title := Label.new()
-	title.text = "── 能量吸收：選擇升級 ──"
+	title.text = "── 能量吸收：選擇強化 ──"
 	title.add_theme_font_size_override("font_size", 22)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	menu_box.add_child(title)
-	for i in range(3):
+	for i in range(mini(3, pool.size())):
+		var card: Dictionary = pool[i]
+		var info := weapon_sys.card_label(card)
 		var btn := Button.new()
-		btn.text = pool[i][0]
-		btn.custom_minimum_size = Vector2(320, 48)
-		var f: Callable = pool[i][1]
-		btn.pressed.connect(func():
-			f.call()
-			menu_open = false
-			player.set_process(true)
-			menu_layer.visible = false)
+		btn.text = "%s\n%s" % [String(info["title"]), String(info["desc"])]
+		btn.custom_minimum_size = Vector2(600, 64)
+		btn.add_theme_font_size_override("font_size", 15)
+		btn.pressed.connect(_on_card_pressed.bind(card))
 		menu_box.add_child(btn)
 	menu_layer.visible = true
+
+
+func _on_card_pressed(card: Dictionary) -> void:
+	weapon_sys.apply_card(card)
+	for w in weapon_sys.check_evolutions():
+		evolution_queue.append(w)
+	_check_suit_tier()
+	_refresh_slots()
+	menu_layer.visible = false
+	menu_open = false
+	player.set_process(true)
+	_proceed_after_menus()
+
+
+func _proceed_after_menus() -> void:
+	if evolution_queue.size() > 0:
+		var w: WeaponSystem.WeaponInst = evolution_queue.pop_front()
+		_show_evolution(w)
+		return
+	if levelups_queued > 0:
+		_open_levelup()
+		return
+	player.set_process(true)
+
+
+func _show_evolution(w: WeaponSystem.WeaponInst) -> void:
+	var def: Dictionary = WeaponData.WEAPONS[w.id]
+	var evo: Dictionary = def["evo"]
+	announce_warn.text = "◆ 武器進化 ◆"
+	announce_name.text = String(evo["name"])
+	announce_desc.text = String(evo["desc"])
+	announce_layer.visible = true
+	announce_time = 2.2
+	player.set_process(false)
+	fx.spawn_burst(player.position, Color(String(evo["color"])), 50, 240.0, 1.0)
+	_refresh_slots()
+
+
+func _check_suit_tier() -> void:
+	var cnt := weapon_sys.evolved_count()
+	var tier := "power"
+	if cnt >= 6:
+		tier = "hyper"
+	elif cnt >= 4:
+		tier = "gravity"
+	elif cnt >= 2:
+		tier = "varia"
+	if tier != player.suit:
+		player.set_suit(tier)
+		fx.spawn_burst(player.position, Color(String(SUIT_HIGHLIGHT[tier])), 44, 230.0, 0.9)
+		flash_time = 0.6   # 變身白閃：刻意保留的稀有慶祝特效（設計決策）
+		flash_rect.visible = true
+		_show_banner(String(SUIT_LABELS[tier]) + " 起動！")
+	if cnt >= 6 and not final_boss_pending:
+		final_boss_pending = true   # M4：QUEEN METROID 頭目戰在此觸發
+
+
+func _show_banner(text: String) -> void:
+	banner_label.text = text
+	banner_label.visible = true
+	banner_time = 1.8
+
 
 # ---------- HUD ----------
 func _build_hud() -> void:
@@ -347,6 +437,14 @@ func _build_hud() -> void:
 	hp_bar.size = Vector2(200, 10)
 	hp_bar.color = Color("#f070a8")
 	hud.add_child(hp_bar)
+	weapon_slots_label = Label.new()
+	weapon_slots_label.position = Vector2(14, 52)
+	weapon_slots_label.add_theme_font_size_override("font_size", 13)
+	hud.add_child(weapon_slots_label)
+	passive_slots_label = Label.new()
+	passive_slots_label.position = Vector2(14, 70)
+	passive_slots_label.add_theme_font_size_override("font_size", 13)
+	hud.add_child(passive_slots_label)
 	timer_label = Label.new()
 	timer_label.position = Vector2(W - 100, 10)
 	timer_label.add_theme_font_size_override("font_size", 22)
@@ -364,6 +462,15 @@ func _build_hud() -> void:
 	xp_bar.size = Vector2(0, 6)
 	xp_bar.color = Color("#58d854")
 	hud.add_child(xp_bar)
+	# 動力服橫幅
+	banner_label = Label.new()
+	banner_label.position = Vector2(0, 64)
+	banner_label.size = Vector2(W, 34)
+	banner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner_label.add_theme_font_size_override("font_size", 26)
+	banner_label.add_theme_color_override("font_color", Color("#ffe27a"))
+	banner_label.visible = false
+	hud.add_child(banner_label)
 	# 升級選單
 	menu_layer = CanvasLayer.new()
 	menu_layer.layer = 10
@@ -379,14 +486,71 @@ func _build_hud() -> void:
 	menu_box = VBoxContainer.new()
 	menu_box.add_theme_constant_override("separation", 14)
 	center.add_child(menu_box)
+	# 進化公告
+	announce_layer = CanvasLayer.new()
+	announce_layer.layer = 15
+	announce_layer.visible = false
+	add_child(announce_layer)
+	var adim := ColorRect.new()
+	adim.color = Color(0.02, 0.0, 0.05, 0.88)
+	adim.size = Vector2(W, H)
+	announce_layer.add_child(adim)
+	var acenter := CenterContainer.new()
+	acenter.size = Vector2(W, H)
+	announce_layer.add_child(acenter)
+	var abox := VBoxContainer.new()
+	abox.add_theme_constant_override("separation", 12)
+	acenter.add_child(abox)
+	announce_warn = Label.new()
+	announce_warn.add_theme_font_size_override("font_size", 20)
+	announce_warn.add_theme_color_override("font_color", Color("#ff7ae0"))
+	announce_warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	abox.add_child(announce_warn)
+	announce_name = Label.new()
+	announce_name.add_theme_font_size_override("font_size", 34)
+	announce_name.add_theme_color_override("font_color", Color("#ffe27a"))
+	announce_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	abox.add_child(announce_name)
+	announce_desc = Label.new()
+	announce_desc.add_theme_font_size_override("font_size", 17)
+	announce_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	abox.add_child(announce_desc)
+	# 變身白閃（最上層）
+	flash_layer = CanvasLayer.new()
+	flash_layer.layer = 30
+	add_child(flash_layer)
+	flash_rect = ColorRect.new()
+	flash_rect.color = Color.WHITE
+	flash_rect.size = Vector2(W, H)
+	flash_rect.visible = false
+	flash_layer.add_child(flash_rect)
 	# 死亡畫面
 	dead_label = Label.new()
-	dead_label.text = "ENERGY DEPLETED\n\n按 R 重新挑戰"
 	dead_label.add_theme_font_size_override("font_size", 30)
 	dead_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	dead_label.position = Vector2(W / 2 - 160, H / 2 - 60)
+	dead_label.position = Vector2(W / 2 - 220, H / 2 - 70)
 	dead_label.visible = false
 	hud.add_child(dead_label)
+
+
+func _refresh_slots() -> void:
+	var wparts := PackedStringArray()
+	for w in weapon_sys.weapons:
+		var def: Dictionary = WeaponData.WEAPONS[w.id]
+		wparts.append("%s %s" % [String(def["name"]), "MAX★" if w.evolved else str(w.level)])
+	if wparts.size() > 0:
+		weapon_slots_label.text = "武器：" + "｜".join(wparts)
+	else:
+		weapon_slots_label.text = "武器：—"
+	var pparts := PackedStringArray()
+	for p in weapon_sys.passives:
+		var pdef: Dictionary = WeaponData.PASSIVES[p.id]
+		pparts.append("%s %d" % [String(pdef["name"]), p.level])
+	if pparts.size() > 0:
+		passive_slots_label.text = "被動：" + "｜".join(pparts)
+	else:
+		passive_slots_label.text = "被動：—"
+
 
 func _update_hud() -> void:
 	hp_label.text = "ENERGY  %d / %d" % [ceili(maxf(0, player.hp)), int(player.max_hp)]
@@ -398,7 +562,11 @@ func _update_hud() -> void:
 	lv_label.text = "LV. %d" % level
 	xp_bar.size.x = 420.0 * clampf(xp / xp_next, 0.0, 1.0)
 
+
 func _game_over() -> void:
 	dead = true
+	var m := int(elapsed) / 60
+	var s := int(elapsed) % 60
+	dead_label.text = "ENERGY DEPLETED\n\n存活 %02d:%02d｜LV %d｜進化 %d 把\n\n按 R 重新挑戰" % [m, s, level, weapon_sys.evolved_count()]
 	dead_label.visible = true
 	player.set_process(false)

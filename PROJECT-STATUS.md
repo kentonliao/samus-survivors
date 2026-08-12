@@ -407,9 +407,32 @@
   HUD/死亡R重開。Player.gd：hp/invul/受擊閃爍/hurt()。
   **GDScript教訓**：Variant陣列元素參與運算時不能用 := 型別推論，需明示型別
   （如 var f: float = ...）；lambda單行複文危險，改用具名方法。
-  **下一步 M3**：完整武器系統移植（12武器+8被動+12進化，資料表驅動，
-  行為類別逐一從index.html移植：projectile/directional/beam_continuous/homing/
-  placed_bomb/delayed_nova/orbit_aura/orbit_field/chain/mine/pulse/radial_burst）。
+  **M3 完成（2026-08-12，程式面已自動化驗證，待玩家實玩驗收）**：完整武器系統移植——
+  ① `WeaponData.gd`：12武器+8被動+12進化資料表（鍵名保留HTML camelCase便於逐欄對照）；
+  ② `WeaponSystem.gd`：12行為類別全移植（projectile/directional/radial_burst/
+  beam_continuous/homing/placed_bomb/delayed_nova/orbit_aura/orbit_field/chain/mine/pulse），
+  彈幕/炸彈/地雷/脈衝/閃電存純資料陣列（RefCounted內部類別），tick()中央驅動、
+  _draw()統一繪製（等同canvas疊繪）；地面物（地雷/炸彈/核彈預警）畫在GroundLayer
+  子節點（有效z=0，敵人之下）；z順序=背景0<地面物<敵人<玩家4<彈幕5<粒子6；
+  ③ `Fx.gd`：粒子爆發/鋸齒星芒命中閃光/爆風環（上限420裁剪）；
+  ④ 升級抽卡：6+6欄位過濾、四種卡（新武器/升級/新被動/升級），卡片文字含進化搭檔
+  進度與「可進化」清單；武器Lv9+搭檔Lv6自動進化→全螢幕公告2.2秒暫停；
+  動力服2/4/6把進化自動變色（player.set_suit重建幀，白閃+橫幅=刻意保留的慶祝特效）；
+  備用能量槽瀕死觸發（signal通知Game放粒子）；冰凍光束減速/絕對零度凍結
+  （敵人凍結時不移動不接觸傷害+冰藍tint）；暴擊/貫穿/多重鎖定/超載電容全域mods同構。
+  M2佔位武器Bolt.gd已刪除；EnemyUnit新增dead/speed_mult/slow_timer/frozen_timer/
+  freeze_cd欄位；killEnemy先標記dead並移除再做死亡效果（HTML v0.9防遞迴教訓照搬），
+  AoE迭代一律用enemies.duplicate()防迭代中移除。
+  **驗證**：--check-only逐檔全過＋`godot/tests/m3_smoke.gd`煙霧測試（headless與有窗各一輪，
+  有窗輪覆蓋所有_draw路徑）：12進化全觸發、HYPER變身、抽卡模擬9張、
+  15項行為旗標（含重力井吸引/共鳴連鎖脈衝的確定性微型試驗）全PASS、零錯誤。
+  **本輪新教訓**：①新增class_name檔案後必須先跑 `godot --headless --import` 重建
+  全域類別快取，否則--check-only會報「找不到型別」假錯誤；②內部類別（如Stats）
+  欄位漏定義只會在runtime爆「Invalid assignment」（trigger_radius案例），
+  新增賦值處要與類別定義逐欄對照；③煙霧測試腳本extends SceneTree用-s執行，
+  時間快轉用Engine.time_scale，機率性分支要另做確定性微型試驗。
+  **下一步 M4**：頭目戰（4巨型中頭目+QUEEN：進場/攻擊模式/死亡演出/連戰/截斷側貼邊
+  照搬HTML；`final_boss_pending`旗標已就位，6把全進化時觸發）。
   HTML 版此後只修bug不加功能。開發循環：Claude寫檔→玩家Godot按F5→回報。
   **v1.9.2（第二十一輪）**：①絕對零度改為持續射線（evo加category:'beam_continuous'+range:300，
   weaponStats以damage×2.4換算dps，tickContinuousBeam持續凍結目標、巨型頭目走freezeCd防永凍；
