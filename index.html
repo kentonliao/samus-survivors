@@ -232,7 +232,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = 'v1.9.2 · 2026-08-12 · 絕對零度射線化＋冰凍藍標示＋連鎖可及頭目＋音量再增';
+const GAME_VERSION = 'v2.0 · 2026-08-12 · 20個像素圖示重繪＋進化武器特效深度強化';
 const W = 960, H = 600;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -298,6 +298,99 @@ const SFX = (function(){
   function toggleMute(){ muted = !muted; return muted; }
   return { init, play, toggleMute };
 })();
+
+/* =========================================================
+   武器/被動 像素圖示（12x12 手繪矩陣，取代 emoji）
+   渲染為離屏canvas→dataURL，image-rendering:pixelated 放大
+========================================================= */
+const ICON_DEFS = (function(){
+  const K='#0a0a0a', W='#ffffff';
+  return {
+    powerBeam:{ p:{K,W,Y:'#ffe14f',O:'#ff9a20'}, r:[
+      "............","....KKKK....","..KKYYYYKK..",".KYYOOOOYYK.",".KYOWWWWOYK.","KYOWWWWWWOYK",
+      "KYOWWWWWWOYK",".KYOWWWWOYK.",".KYYOOOOYYK.","..KKYYYYKK..","....KKKK....","............"]},
+    iceBeam:{ p:{K,W,C:'#5cd8ff'}, r:[
+      "............",".....KK.....","..K..CC..K..",".KC.KCCK.CK.","..CCKCCKCC..","...CCWWCC...",
+      "...CCWWCC...","..CCKCCKCC..",".KC.KCCK.CK.","..K..CC..K..",".....KK.....","............"]},
+    waveBeam:{ p:{K,W,P:'#c86bff'}, r:[
+      "............","KK.....KK...","KPK...KPPK..","KPPK.KPPPK..",".KPPKPPPK...","..KPPPPK....",
+      "...KPPK..KK.","..KPPPPKKPK.",".KPPKKPPPPK.","KPPK..KPPK..","KK.....KK...","............"]},
+    plasmaBeam:{ p:{K,W,M:'#ff5fd0'}, r:[
+      "............","............","KKKKKKKKKKKK","KMMMMMMMMMMK","KMWWWWWWWWMK","KMWWWWWWWWMK",
+      "KMWWWWWWWWMK","KMMMMMMMMMMK","KKKKKKKKKKKK","............","............","............"]},
+    spazerBeam:{ p:{K,W,Y:'#ffe14f'}, r:[
+      "KKKKKKKKKK..","KYYYYYYYYK..","KKKKKKKKKK..","............","KKKKKKKKKKKK","KYYWWWWWYYK.",
+      "KKKKKKKKKKKK","............","KKKKKKKKKK..","KYYYYYYYYK..","KKKKKKKKKK..","............"]},
+    missile:{ p:{K,W,R:'#ff4030',G:'#9aa4b8',O:'#ff9a20'}, r:[
+      "....KKK.....","...KRRRK....","...KRWRK....","...KRRRK....","...KGGGK....","...KGGGK....",
+      "...KGGGK....","...KGGGK....","..KGKGKGK...","..KOKKKOK...","...KOOOK....","....KKK....."]},
+    bombTrail:{ p:{K,W,O:'#ffae3c'}, r:[
+      "......KW....",".....KK.....","....KK......","...KKKKK....","..KOOOOOK...",".KOOWWOOOK..",
+      ".KOWWOOOOK..",".KOOOOOOOK..",".KOOOOOOK...","..KOOOOK....","...KKKK.....","............"]},
+    powerBomb:{ p:{K,W,Y:'#fff340',O:'#ff7a30'}, r:[
+      "....KKKK....","..KKYYYYKK..",".KYYWWWWYYK.",".KYWWYYWWYK.","KYYWYOOYWYYK","KYYWOOOOWYYK",
+      "KYYWOOOOWYYK","KYYWYOOYWYYK",".KYWWYYWWYK.",".KYYWWWWYYK.","..KKYYYYKK..","....KKKK...."]},
+    screwAttack:{ p:{K,W,P:'#c58bff'}, r:[
+      "...KKK......","..KPPPK..K..",".KPPPKKKKPK.",".KPPK..KPPK.",".KPK.KK.KPK.",".KPK.WW.KPK.",
+      ".KPK.WW.KPK.",".KPK.KK.KPK.",".KPPK..KPPK.",".KPKKKKPPPK.","..K..KPPPK..","......KKK..."]},
+    grappleBeam:{ p:{K,W,C:'#6ce8ff'}, r:[
+      "........KK..",".......KCK..","......KCK...","...KKKCCK...","..KCCCCK....","..KCCCK.....",
+      ".KCCCK......","KCCCCKKK....","KKKCCCCK....","..KKKCCK....",".....KCK....","......K....."]},
+    spiderMine:{ p:{K,W,A:'#ffb830'}, r:[
+      ".....KK.....","..K.KAAK.K..","...KAAAAK...",".KKAAWWAAKK.",".KAAWWWWAAK.","KAAWWWWWWAAK",
+      "KAAWWWWWWAAK",".KAAWWWWAAK.",".KKAAAAAAKK.","...KAAAAK...","..K.KAAK.K..",".....KK....."]},
+    echoPulse:{ p:{K,W,T:'#3ee8c8'}, r:[
+      "...KKKKK....","..KTTTTTK...",".KT.....TK..",".KT.KKK.TK..",".KT.KTK.TK..",".KT.KWK.TK..",
+      ".KT.KTK.TK..",".KT.KKK.TK..",".KT.....TK..","..KTTTTTK...","...KKKKK....","............"]},
+    energyTank:{ p:{K,W,E:'#f070a8'}, r:[
+      "...KKKKK....","..KEEEEEK...",".KEEWWWEEK..",".KEEWEEEEK..",".KEEWWWEEK..",".KEEWEEEEK..",
+      ".KEEWWWEEK..",".KEEEEEEEK..",".KEEEEEEK...","..KEEEEK....","...KKKK.....","............"]},
+    magnetCore:{ p:{K,W,R:'#ff5050',B:'#6888f8'}, r:[
+      "..KKK..KKK..",".KRRK..KBBK.",".KRRK..KBBK.",".KRRK..KBBK.",".KRRK..KBBK.",".KRRKKKKBBK.",
+      ".KRRRRBBBBK.",".KWWRRBBWWK.","..KWWWWWWK..","...KKKKKK...","............","............"]},
+    reserveTank:{ p:{K,W,E:'#f070a8'}, r:[
+      "...KKKKK....","..KE...EK...",".KE.....EK..",".KE.WWW.EK..",".KE.W.W.EK..",".KE.WWW.EK..",
+      ".KE.WW..EK..",".KE.W.W.EK..",".KE.....EK..","..KE...EK...","...KKKKK....","............"]},
+    boosterCoil:{ p:{K,W,G:'#58d854'}, r:[
+      ".K....K.....",".KG...KG....",".KGG..KGG...",".KGGG.KGGG..",".KGGGGKGGGG.",".KGGGWKGGGW.",
+      ".KGGGGKGGGG.",".KGGG.KGGG..",".KGG..KGG...",".KG...KG....",".K....K.....","............"]},
+    multiLockModule:{ p:{K,W,R:'#ff5050'}, r:[
+      ".....KK.....","....KRRK....",".....KK.....","..K......K..",".KR..KK..RK.","KR..KWWK..RK",
+      "KR..KWWK..RK",".KR..KK..RK.","..K......K..",".....KK.....","....KRRK....",".....KK....."]},
+    overloadCapacitor:{ p:{K,W,Y:'#ffe14f'}, r:[
+      "...KKKKK....","..K.....K...",".K...KY..K..",".K..KYY..K..",".K.KYYYK.K..",".K.KKYYK.K..",
+      ".K...KYK.K..",".K..KYK..K..",".K..KY...K..","..K.Y...K...","...KKKKK....","............"]},
+    piercingCore:{ p:{K,W,C:'#6ce8ff'}, r:[
+      "......K.....","......KK....","KKKKKKKCK...","KCCCCCCCCK..","KCWWWWWCCCK.","KCWWWWWCCCCK",
+      "KCWWWWWCCCK.","KCCCCCCCCK..","KKKKKKKCK...","......KK....","......K.....","............"]},
+    criticalSensor:{ p:{K,W,O:'#ff9a20'}, r:[
+      ".....KK.....",".K..KOOK..K.","..K.KOOK.K..","...KKOOKK...",".KOOOWWOOOK.","KOOOWWWWOOOK",
+      "KOOOWWWWOOOK",".KOOOWWOOOK.","...KKOOKK...","..K.KOOK.K..",".K..KOOK..K.",".....KK....."]},
+  };
+})();
+const ICON_CACHE = {};
+function iconURL(id){
+  if(ICON_CACHE[id] !== undefined) return ICON_CACHE[id];
+  const def = ICON_DEFS[id];
+  if(!def){ ICON_CACHE[id] = null; return null; }
+  const cv = document.createElement('canvas'); cv.width = 12; cv.height = 12;
+  const c = cv.getContext('2d');
+  for(let y=0; y<def.r.length && y<12; y++){
+    const row = def.r[y];
+    for(let x=0; x<row.length && x<12; x++){
+      const ch = row[x];
+      if(ch === '.') continue;
+      c.fillStyle = def.p[ch] || '#fff';
+      c.fillRect(x, y, 1, 1);
+    }
+  }
+  ICON_CACHE[id] = cv.toDataURL();
+  return ICON_CACHE[id];
+}
+function iconHTML(id, size, fallbackEmoji){
+  const u = iconURL(id);
+  return u ? '<img src="'+u+'" style="width:'+size+'px;height:'+size+'px;image-rendering:pixelated;vertical-align:middle;">' : (fallbackEmoji||'');
+}
 
 const $ = (id)=>document.getElementById(id);
 const hpNum = $('hp-num'), hpBar = $('hp-bar-inner');
@@ -2015,7 +2108,8 @@ function fireRadialBurst(w, s){
   for(let i=0;i<count;i++){
     const ang = (Math.PI*2/count)*i;
     pushProjectile({ x:player.x,y:player.y, vx:Math.cos(ang)*(s.speed||460), vy:Math.sin(ang)*(s.speed||460),
-      dmg:s.damage, r:4, pierce:Math.round(s.pierce||4), life:1.1, color: def.evo.color, age:0,
+      dmg:s.damage, r:4, pierce:Math.round(s.pierce||4), life:1.1,
+      color: def.evo.id==='prismaticSpazer' ? ['#ffe14f','#ff9a4f','#ff5f8a','#8a7dff','#4fd8ff'][i%5] : def.evo.color, age:0,
       shape: def.shape||'star', evolved:true, weaponId:w.id });
   }
   spawnBurst(player.x,player.y, def.evo.color, 12, 90, 0.3);
@@ -2033,6 +2127,7 @@ function tickContinuousBeam(w, s, dt){
       const en = w.beamTarget;
       if(en.giant){ if(!(en.freezeCd>0) && !en.entering){ en.frozenTimer = 0.8; en.freezeCd = 4; } }
       else { en.frozenTimer = Math.max(en.frozenTimer||0, 0.35); }
+      if(Math.random() < dt*14){ spawnBurst(en.x + rand(-1,1)*en.r*0.6, en.y + rand(-1,1)*en.r*0.6, '#bfeaff', 1, 48, 0.4); }
     }
   }
 }
@@ -2339,6 +2434,7 @@ function updateProjectiles(dt){
       p.x += Math.cos(perpAng)*wob; p.y += Math.sin(perpAng)*wob;
     }
     p.x += p.vx*dt; p.y += p.vy*dt; p.life -= dt;
+    if(p.evolved && Math.random() < dt*26){ spawnBurst(p.x - p.vx*0.02, p.y - p.vy*0.02, p.color, 1, 30, 0.35); }
     if(p.life<=0 || p.x<-20||p.x>W+20||p.y<-20||p.y>H+20){ projectiles.splice(i,1); continue; }
     for(let j=enemies.length-1;j>=0;j--){
       const en = enemies[j];
@@ -2477,6 +2573,8 @@ function drawOrbitEffects(){
       for(let i=0;i<blades;i++){
         const a = elapsed*5 + (Math.PI*2/blades)*i;
         ctx.save(); ctx.rotate(a);
+        if(w.evolved){ ctx.globalAlpha=0.2; ctx.fillStyle=color; ctx.rotate(-0.28);
+          ctx.beginPath(); ctx.moveTo(4,-3); ctx.lineTo(s.radius,-7); ctx.lineTo(s.radius,7); ctx.lineTo(4,3); ctx.closePath(); ctx.fill(); ctx.rotate(0.28); }
         ctx.globalAlpha=0.55; ctx.fillStyle=color;
         ctx.beginPath(); ctx.moveTo(4,-3); ctx.lineTo(s.radius,-7); ctx.lineTo(s.radius,7); ctx.lineTo(4,3); ctx.closePath(); ctx.fill();
         ctx.globalAlpha=0.75; ctx.fillStyle='#fff';
@@ -2497,6 +2595,11 @@ function drawOrbitEffects(){
         ctx.beginPath(); ctx.arc(bx,by, w.evolved?10:8, 0, Math.PI*2); ctx.fill();
         ctx.globalAlpha=0.9; ctx.fillStyle='#fff';
         ctx.beginPath(); ctx.arc(bx,by, w.evolved?4:3, 0, Math.PI*2); ctx.fill();
+      }
+      if(w.evolved){ // 風暴旋轉電弧
+        ctx.globalAlpha=0.35; ctx.strokeStyle=color; ctx.lineWidth=3;
+        ctx.beginPath(); ctx.arc(0,0,s.radius, elapsed*3, elapsed*3+Math.PI*1.15); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0,0,s.radius*0.72, -elapsed*4, -elapsed*4+Math.PI*0.9); ctx.stroke();
       }
       ctx.globalAlpha=0.1; ctx.fillStyle=color;
       ctx.beginPath(); ctx.arc(0,0,s.radius,0,Math.PI*2); ctx.fill();
@@ -3234,7 +3337,7 @@ function openLevelUp(){
     const info = cardLabel(card.kind, card.id);
     const el = document.createElement('div');
     el.className = 'card' + (card.kind==='newWeapon'||card.kind==='newPassive' ? ' newk' : '');
-    el.innerHTML = `<div class="card-emoji">${info.emoji}</div><div class="card-name">${info.name}</div><div class="card-lv">${info.lv}</div><div class="card-desc">${info.desc}</div>`;
+    el.innerHTML = `<div class="card-emoji">${iconHTML(card.id, 44, info.emoji)}</div><div class="card-name">${info.name}</div><div class="card-lv">${info.lv}</div><div class="card-desc">${info.desc}</div>`;
     el.addEventListener('click', ()=>{ applyCard(card); afterCardApplied(); });
     cardsEl.appendChild(el);
   }
@@ -3329,7 +3432,7 @@ $('btn-victory-restart').addEventListener('click', startGame);
 function showEvolutionAnnouncement(w){
   state = 'evolution';
   const def = WEAPON_DEFS[w.id];
-  evoEmoji.textContent = def.evo.emoji;
+  evoEmoji.innerHTML = iconHTML(w.id, 56, def.evo.emoji);
   evoName.textContent = def.evo.name;
   evoDesc.textContent = def.evo.desc;
   evoOverlay.classList.remove('hidden');
@@ -3352,14 +3455,14 @@ function refreshSlotBar(){
     const w = player.weapons[i];
     const div = document.createElement('div');
     div.className = 'slot' + (w?(w.evolved?' evolved':''):' empty');
-    if(w){ const def=WEAPON_DEFS[w.id]; div.innerHTML = (w.evolved?def.evo.emoji:def.emoji) + `<span class="lv">${w.evolved?'MAX':w.level}</span>`; }
+    if(w){ const def=WEAPON_DEFS[w.id]; div.innerHTML = iconHTML(w.id, 16, w.evolved?def.evo.emoji:def.emoji) + `<span class="lv">${w.evolved?'MAX':w.level}</span>`; }
     weaponSlotsEl.appendChild(div);
   }
   for(let i=0;i<6;i++){
     const p = player.passives[i];
     const div = document.createElement('div');
     div.className = 'slot' + (p?'':' empty');
-    if(p){ const def=PASSIVE_DEFS[p.id]; div.innerHTML = def.emoji + `<span class="lv">${p.level}</span>`; }
+    if(p){ const def=PASSIVE_DEFS[p.id]; div.innerHTML = iconHTML(p.id, 16, def.emoji) + `<span class="lv">${p.level}</span>`; }
     passiveSlotsEl.appendChild(div);
   }
 }

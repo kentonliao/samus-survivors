@@ -380,8 +380,12 @@
   ⑨磁力地雷萊姆綠→琥珀金#ffb830（苔蘚地上隱形問題） ⑩進化武器配色去白化：
   nova金橘/absoluteZero冰藍/plasmaStorm洋紅/prismatic檸黃/superMissile橘紅/chainReaction橙/
   zeroCountdown亮黃/shinespark粉紫/chainLightning電光青/gravityWell紫/resonance青綠。
-  **待辦（玩家已提，下輪候選）**：④武器/被動20個圖示從emoji重繪為Metroid風像素圖
-  （可用字母矩陣+離屏canvas轉dataURL塞進DOM）；⑩進化武器特效「更酷炫」的深度重設計。
+  **v2.0（第二十二輪）**：④20個像素圖示完成——`ICON_DEFS`（12x12手繪字母矩陣）+
+  `iconURL/iconHTML`（離屏canvas→dataURL快取），替換槽位列/升級卡片/進化公告三處emoji
+  （emoji保留為fallback）。**圖示為初稿，個別不滿意可指名重繪**。
+  ⑩進化特效深度強化：進化彈幕通用拖尾粒子、電漿風暴旋轉電弧、稜光散射七彩稜鏡彈
+  （5色循環）、閃光衝刺刀刃殘影、零度射線目標冰晶飛濺。
+  驗證：20圖示全渲染、進化武器混合實戰200幀零錯誤。
   **v1.9.2（第二十一輪）**：①絕對零度改為持續射線（evo加category:'beam_continuous'+range:300，
   weaponStats以damage×2.4換算dps，tickContinuousBeam持續凍結目標、巨型頭目走freezeCd防永凍；
   射線用進化冰藍色+白芯）；被凍結敵人蓋透明藍圓形標示（drawEnemies）
