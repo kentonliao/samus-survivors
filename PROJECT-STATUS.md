@@ -396,7 +396,20 @@
   M0+M1 完成：godot/ 專案骨架（960x600、Nearest過濾、GL Compatibility）＋
   78個PNG資產（export_assets.py 從 index.html 矩陣解析匯出）＋
   Player.gd（WASD移動/跑步10幀15fps/翻面/呼吸/邊界，手感參數照搬HTML版）。
-  **下一步 M2**：敵人與生成（7雜兵+精英+難度曲線+晶石+升級選單）。
+  **M1 驗收通過**（流暢度修正：移動改 _process 每渲染幀更新＝HTML的rAF方式，
+  本作不用物理引擎；油畫感模糊修正：Main根節點 texture_filter=1(Nearest)，子節點繼承）。
+  **底解析度定案 960x540（16:9）**：x2=1080p、x4=4K整數縮放，視窗預設1920x1080；
+  Steam精品感路線=維持像素風+M5加2D Glow/畫面震動（不重繪素材）；
+  玩家另表示「之後希望細節更多」（高密度素材重繪為未來選項，管線已支援）。
+  **M2 完成並驗收通過（2026-08-12）**：Game.gd中央迴圈（HTML同構）——
+  7雜兵行為/難度曲線/邊緣+批次生成/精英鍍金modulate/接觸傷害/受擊白閃/
+  經驗晶石磁吸+45顆整合結晶/佔位武器力量光束（彗星_draw）/升級選單6選3文字卡/
+  HUD/死亡R重開。Player.gd：hp/invul/受擊閃爍/hurt()。
+  **GDScript教訓**：Variant陣列元素參與運算時不能用 := 型別推論，需明示型別
+  （如 var f: float = ...）；lambda單行複文危險，改用具名方法。
+  **下一步 M3**：完整武器系統移植（12武器+8被動+12進化，資料表驅動，
+  行為類別逐一從index.html移植：projectile/directional/beam_continuous/homing/
+  placed_bomb/delayed_nova/orbit_aura/orbit_field/chain/mine/pulse/radial_burst）。
   HTML 版此後只修bug不加功能。開發循環：Claude寫檔→玩家Godot按F5→回報。
   **v1.9.2（第二十一輪）**：①絕對零度改為持續射線（evo加category:'beam_continuous'+range:300，
   weaponStats以damage×2.4換算dps，tickContinuousBeam持續凍結目標、巨型頭目走freezeCd防永凍；
