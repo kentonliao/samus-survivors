@@ -232,7 +232,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = 'v1.9.1 · 2026-08-12 · UI回饋修正＋警報強化＋進化配色去白化';
+const GAME_VERSION = 'v1.9.2 · 2026-08-12 · 絕對零度射線化＋冰凍藍標示＋連鎖可及頭目＋音量再增';
 const W = 960, H = 600;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -249,7 +249,7 @@ const SFX = (function(){
     if(ac) return;
     try{
       ac = new (window.AudioContext||window.webkitAudioContext)();
-      master = ac.createGain(); master.gain.value = 0.45; master.connect(ac.destination);
+      master = ac.createGain(); master.gain.value = 0.9; master.connect(ac.destination);
     }catch(e){ ac = null; }
   }
   function beep(type, f0, f1, dur, vol, delay){
@@ -1735,8 +1735,8 @@ const WEAPON_DEFS = {
   iceBeam:{ name:'冰凍光束', emoji:'❄️', category:'projectile', color:'#8fe8ff', shape:'shard',
     baseDmg:6, dmgPerLv:2.6, baseCd:0.5, cdPerLv:-0.025, minCd:0.18, baseCount:1, countEvery:3, basePierce:1, speed:420,
     slowBase:0.28, slowPerLv:0.02,
-    evoPartner:'piercingCore', evo:{ id:'absoluteZero', name:'Absolute Zero 絕對零度', emoji:'🧊', color:'#5cd8ff',
-      desc:'貫穿全場並凍結敵人，凍結目標死亡時引發冰爆。', dmgMult:2.0, pierceAdd:8, freeze:true, shatterAoe:true } },
+    evoPartner:'piercingCore', evo:{ id:'absoluteZero', name:'Absolute Zero 絕對零度', emoji:'🧊', color:'#5cd8ff', category:'beam_continuous', range:300,
+      desc:'凝聚成絕對零度射線，持續凍結並灼蝕目標。', dmgMult:2.0, freeze:true } },
   waveBeam:{ name:'波動光束', emoji:'〰️', category:'directional', color:'#c86bff', wavy:true, shape:'ribbon',
     baseDmg:7, dmgPerLv:2.8, baseCd:0.48, cdPerLv:-0.025, minCd:0.2, baseCount:1, countEvery:1, basePierce:5, speed:480,
     evoPartner:'multiLockModule', evo:{ id:'cascadeBeam', name:'Cascade Beam 連鎖波動', emoji:'🌊', color:'#e3b8ff',
@@ -1914,6 +1914,7 @@ function weaponStats(w){
     if(evo.blastRadiusAdd && s.blastRadius!==undefined) s.blastRadius += evo.blastRadiusAdd;
     if(evo.radius && def.category==='beam_continuous') s.radius = evo.radius;
   }
+  if(w.evolved && def.evo.category==='beam_continuous' && s.dps===undefined){ s.dps = (s.damage||10) * 2.4; }
   if(s.damage!==undefined && Math.random()<m.critChance){ s.damage *= 2; s.isCrit=true; }
   return s;
 }
@@ -2022,9 +2023,18 @@ function fireRadialBurst(w, s){
 
 function tickContinuousBeam(w, s, dt){
   const def = WEAPON_DEFS[w.id];
+  const range = (w.evolved && def.evo.range) || def.range;
   const target = nearestEnemy(player.x, player.y);
-  w.beamTarget = (target && dist2(player.x,player.y,target.x,target.y) < (def.range*def.range)) ? target : null;
-  if(w.beamTarget){ damageEnemy(w.beamTarget, s.dps*dt); }
+  const reach = target ? range + (target.r||0) : 0; // 以身體邊緣計距，巨型頭目才搆得到
+  w.beamTarget = (target && dist2(player.x,player.y,target.x,target.y) < reach*reach) ? target : null;
+  if(w.beamTarget){
+    damageEnemy(w.beamTarget, s.dps*dt);
+    if(w.evolved && def.evo.freeze){ // 絕對零度射線：持續凍結目標
+      const en = w.beamTarget;
+      if(en.giant){ if(!(en.freezeCd>0) && !en.entering){ en.frozenTimer = 0.8; en.freezeCd = 4; } }
+      else { en.frozenTimer = Math.max(en.frozenTimer||0, 0.35); }
+    }
+  }
 }
 
 function tickOrbitField(w, s, dt){
@@ -2153,8 +2163,9 @@ function fireChain(w, s){
     let best=null, bd=Infinity;
     for(const en of enemies){
       if(excluded.has(en)) continue;
+      const rr = s.range + (en.r||0); // 以身體邊緣計距，巨型頭目才連得到
       const d = dist2(last.x,last.y,en.x,en.y);
-      if(d<bd && d < s.range*s.range){ bd=d; best=en; }
+      if(d<bd && d < rr*rr){ bd=d; best=en; }
     }
     if(!best) break;
     damageEnemy(best, s.damage);
@@ -2440,11 +2451,12 @@ function drawContinuousBeams(){
     if(w.beamTarget){
       ctx.save();
       ctx.beginPath(); ctx.moveTo(player.x,player.y); ctx.lineTo(w.beamTarget.x,w.beamTarget.y);
-      ctx.globalAlpha=0.3; ctx.strokeStyle=def.color; ctx.lineWidth=9; ctx.stroke();
+      const bcol = (w.evolved && def.evo.color) || def.color;
+      ctx.globalAlpha=0.3; ctx.strokeStyle=bcol; ctx.lineWidth=9; ctx.stroke();
       ctx.globalAlpha=0.9; ctx.lineWidth=4; ctx.stroke();
       ctx.strokeStyle='#fff'; ctx.lineWidth=1.6; ctx.stroke();
       // 命中點光斑
-      ctx.globalAlpha=0.5; ctx.fillStyle=def.color;
+      ctx.globalAlpha=0.5; ctx.fillStyle=bcol;
       ctx.beginPath(); ctx.arc(w.beamTarget.x, w.beamTarget.y, 9+Math.sin(elapsed*20)*2, 0, Math.PI*2); ctx.fill();
       ctx.globalAlpha=0.95; ctx.fillStyle='#fff';
       ctx.beginPath(); ctx.arc(w.beamTarget.x, w.beamTarget.y, 3.5, 0, Math.PI*2); ctx.fill();
@@ -3023,6 +3035,11 @@ function drawEnemies(){
       ctx.fillStyle = flash ? mixWhite('#000000',0.5) : '#00000055';
       for(let i=-1;i<=1;i+=2){ ctx.fillRect(i*8-2, bob+en.r*0.5, 4, 6+Math.sin(en.phase*2)*2); }
       ctx.fillStyle = '#ff2e2e'; ctx.fillRect(-4,bob-4,3,3); ctx.fillRect(2,bob-4,3,3);
+    }
+    if(en.frozenTimer>0){ // 冰凍標示：透明藍覆蓋
+      ctx.globalAlpha = 0.38; ctx.fillStyle = '#7fd8ff';
+      ctx.beginPath(); ctx.arc(0,0,en.r+3,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 1;
     }
     ctx.restore();
 

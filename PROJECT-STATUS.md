@@ -381,7 +381,13 @@
   nova金橘/absoluteZero冰藍/plasmaStorm洋紅/prismatic檸黃/superMissile橘紅/chainReaction橙/
   zeroCountdown亮黃/shinespark粉紫/chainLightning電光青/gravityWell紫/resonance青綠。
   **待辦（玩家已提，下輪候選）**：④武器/被動20個圖示從emoji重繪為Metroid風像素圖
-  （可用字母矩陣+離屏canvas轉dataURL塞進DOM）；⑩進化武器特效「更酷炫」的深度重設計）
+  （可用字母矩陣+離屏canvas轉dataURL塞進DOM）；⑩進化武器特效「更酷炫」的深度重設計。
+  **v1.9.2（第二十一輪）**：①絕對零度改為持續射線（evo加category:'beam_continuous'+range:300，
+  weaponStats以damage×2.4換算dps，tickContinuousBeam持續凍結目標、巨型頭目走freezeCd防永凍；
+  射線用進化冰藍色+白芯）；被凍結敵人蓋透明藍圓形標示（drawEnemies）
+  ②總音量0.45→0.9 ③連鎖閃電與持續光束改「以敵人身體邊緣計距」——原本以中心點計距，
+  巨型頭目（r≈110+）永遠搆不到，這就是玩家「頭目戰沒看過閃電」的根因。
+  驗證：零度射線鎖定頭目/傷害/凍結、連鎖150px外連到頭目，零錯誤）
 
 ---
 
