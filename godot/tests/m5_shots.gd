@@ -76,20 +76,20 @@ func _process(delta: float) -> bool:
 			if t > 3.1:
 				step = 5
 				_shot("m5_evolve.png")
-				game.announce_time = 0.01
+				game.debug_skip_announce()
 		5:
 			if t > 3.6:
 				step = 6
-				game._show_boss_announce("KRAID", "巨大生物反應接近中，雜兵生產已停止。迎擊！", 5.0, "", {})
+				game._show_boss_announce("KRAID", "巨大生物反應接近中，雜兵生產已停止。迎擊！", "", {})
 		6:
 			if t > 4.2:
 				step = 7
 				_shot("m5_boss.png")
-				game.announce_time = 0.01
+				game.debug_skip_announce()
 		7:
 			if t > 4.6:
 				step = 8
-				game.hud.show_cutin(Color("#ff6a1a"), "VARIA SUIT 起動！")
+				game.hud.show_cutin("gravity", Color("#7b2fbe"), "GRAVITY SUIT 起動！")
 		8:
 			if t > 5.1:
 				step = 9

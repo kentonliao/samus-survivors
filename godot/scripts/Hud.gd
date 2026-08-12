@@ -104,7 +104,11 @@ var cutin_dim: ColorRect
 var cutin_stripes: CutinStripes
 var cutin_portrait: TextureRect
 var cutin_name: Label
+var cutin_hint: Label
 var cutin_t := -1.0            # <0 = 未播放
+var cutin_dismissed := false   # 定格等待任意鍵（Game 呼叫 dismiss_cutin 才滑出）
+var evo_hint: Label
+var boss_hint: Label
 const CUTIN_TOTAL := 1.75
 
 
@@ -146,11 +150,16 @@ func _process(delta: float) -> void:
 	var tms := Time.get_ticks_msec()
 	if boss_overlay.visible:
 		boss_warn.visible = tms % 600 < 300
+		boss_hint.modulate.a = 1.0 if tms % 1200 < 600 else 0.2
+	if evo_overlay.visible:
+		evo_hint.modulate.a = 1.0 if tms % 1200 < 600 else 0.2
 	if end_overlay.visible:
 		end_hint.modulate.a = 1.0 if tms % 1200 < 600 else 0.15
-	# 變身 cut-in 程序動畫：滑入(0.22s)→定格→加速滑出(1.4s起)
+	# 變身 cut-in 程序動畫：滑入(0.22s)→定格（等任意鍵）→加速滑出(1.4s起)
 	if cutin_t >= 0.0:
 		cutin_t += delta
+		if cutin_t >= 1.4 and not cutin_dismissed:
+			cutin_t = 1.4   # 定格：等 Game 收到輸入呼叫 dismiss_cutin()
 		var in_p := clampf(cutin_t / 0.22, 0.0, 1.0)
 		var ease_in := 1.0 - pow(1.0 - in_p, 3.0)
 		var out_p := clampf((cutin_t - 1.4) / 0.3, 0.0, 1.0)
@@ -159,6 +168,7 @@ func _process(delta: float) -> void:
 		cutin_name.position.x = lerpf(W + 40.0, 460.0, ease_in) - ease_out * 1400.0
 		cutin_stripes.position.x = lerpf(-W, 0.0, ease_in) + ease_out * W
 		cutin_dim.modulate.a = minf(in_p, 1.0 - ease_out)
+		cutin_hint.visible = cutin_t >= 0.9 and not cutin_dismissed and tms % 1200 < 600
 		if cutin_t >= CUTIN_TOTAL:
 			hide_cutin()
 
@@ -215,13 +225,16 @@ func _overlay_base(dim: Color, grid: Color) -> Control:
 	var o := Control.new()
 	o.size = Vector2(W, H)
 	o.visible = false
+	o.mouse_filter = Control.MOUSE_FILTER_IGNORE   # 裝飾層不得攔截滑鼠（排除鈕無效bug排查）
 	var bg := ColorRect.new()
 	bg.color = dim
 	bg.size = Vector2(W, H)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	o.add_child(bg)
 	var g := GridPattern.new()
 	g.grid_col = grid
 	g.size = Vector2(W, H)
+	g.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	o.add_child(g)
 	add_child(o)
 	return o
@@ -258,17 +271,20 @@ func _build() -> void:
 	hp_bar.col = C_PINK
 	hp_bar.col_dark = C_PINK_DK
 	hp_panel.add_child(hp_bar)
-	# 計時面板（右上）——寬度需含裕度：文字min寬>框寬時Label會直接溢出框線
-	var t_panel := _corner_panel(Vector2(W - 14 - 196, 14), Vector2(196, 58))
+	# 計時面板（右上）——用 Label 自身 get_minimum_size 量寬（與實際渲染字型一致；
+	# ThemeDB.fallback_font 量測會低估導致文字被切，實測踩到）
+	timer_label = _label("88:88", 22, C_ORANGE)
+	var depth := _label("CRATERIA SURFACE", 9, Color("#c8c8d8"))
+	var tp_w := maxf(timer_label.get_minimum_size().x, depth.get_minimum_size().x) + 30.0
+	var t_panel := _corner_panel(Vector2(W - 14 - tp_w, 14), Vector2(tp_w, 58))
 	add_child(t_panel)
-	timer_label = _label("00:00", 22, C_ORANGE)
+	timer_label.text = "00:00"
 	timer_label.position = Vector2(12, 4)
-	timer_label.size = Vector2(172, 30)
+	timer_label.size = Vector2(tp_w - 24, 30)
 	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	t_panel.add_child(timer_label)
-	var depth := _label("CRATERIA SURFACE", 9, Color("#c8c8d8"))
 	depth.position = Vector2(12, 38)
-	depth.size = Vector2(172, 14)
+	depth.size = Vector2(tp_w - 24, 14)
 	depth.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	t_panel.add_child(depth)
 	# XP 面板（底部中央）
@@ -389,6 +405,9 @@ func _build() -> void:
 	var evo_dc := CenterContainer.new()
 	evo_dc.add_child(evo_desc)
 	evo_box.add_child(evo_dc)
+	evo_hint = _label("▼ 按任意鍵繼續", 13, C_TEXT_DIM)
+	evo_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	evo_box.add_child(evo_hint)
 	# 頭目警告
 	boss_overlay = _overlay_base(Color(0.024, 0.0, 0.0, 0.93), GRID_RED)
 	var b_center := CenterContainer.new()
@@ -410,6 +429,9 @@ func _build() -> void:
 	var bf_c := CenterContainer.new()
 	bf_c.add_child(boss_flavor)
 	b_box.add_child(bf_c)
+	boss_hint = _label("▼ 按任意鍵迎擊", 13, C_TEXT_DIM)
+	boss_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b_box.add_child(boss_hint)
 	# 勝敗結算
 	end_overlay = _overlay_base(Color(0.012, 0.004, 0.024, 0.94), GRID_PURPLE)
 	var e_center := CenterContainer.new()
@@ -456,6 +478,12 @@ func _build() -> void:
 	cutin_name.position = Vector2(W + 40, 240)
 	cutin_name.size = Vector2(520, 60)
 	cutin_layer.add_child(cutin_name)
+	cutin_hint = _label("▼ 按任意鍵繼續", 13, C_TEXT_DIM)
+	cutin_hint.position = Vector2(W - 240, H - 34)
+	cutin_hint.size = Vector2(220, 20)
+	cutin_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	cutin_hint.visible = false
+	cutin_layer.add_child(cutin_hint)
 	# 變身白閃（最上層）
 	flash_rect = ColorRect.new()
 	flash_rect.color = Color.WHITE
@@ -535,6 +563,7 @@ func open_levelup(picks: Array, reroll_left: int, banish_left: int) -> void:
 	for pick in picks:
 		var col := VBoxContainer.new()
 		col.add_theme_constant_override("separation", 8)
+		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var btn := _make_card(pick)
 		card_buttons.append(btn)
 		col.add_child(btn)
@@ -585,14 +614,16 @@ func _make_card(info: Dictionary) -> Button:
 	btn.add_theme_stylebox_override("hover", sb_h)
 	btn.add_theme_stylebox_override("pressed", sb_h)
 	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	# 內容
+	# 內容（全部 IGNORE：卡片內容物不得攔截點擊，點哪都要落在按鈕上）
 	var box := VBoxContainer.new()
 	box.position = Vector2(12, 22)
 	box.size = Vector2(200, 176)
 	box.add_theme_constant_override("separation", 10)
 	box.alignment = BoxContainer.ALIGNMENT_BEGIN
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	btn.add_child(box)
 	var ic := CenterContainer.new()
+	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ic.add_child(_icon_rect(String(info["icon"]), 44.0))
 	box.add_child(ic)
 	var lv := _label(String(info["lv_line"]), 12, C_GOLD if is_new else C_GREEN, false)
@@ -607,6 +638,7 @@ func _make_card(info: Dictionary) -> Button:
 	var chip_wrap := CenterContainer.new()
 	chip_wrap.position = Vector2(0, -12)
 	chip_wrap.size = Vector2(224, 24)
+	chip_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	btn.add_child(chip_wrap)
 	var prefix := "★ " if is_new else "● "
 	var chip := _label(prefix + String(info["name"]), 12, C_GOLD if is_new else C_ORANGE, false)
@@ -648,20 +680,33 @@ func hide_announce() -> void:
 	boss_overlay.visible = false
 
 
-func show_cutin(suit_color: Color, title: String) -> void:
+func show_cutin(tier: String, suit_color: Color, title: String) -> void:
+	# 各套動力服專屬立繪（色相重映射產生，見 scratchpad/cutin_suits.py）
+	var path := "res://assets/cutin_samus_%s.png" % tier
+	if not ResourceLoader.exists(path):
+		path = "res://assets/cutin_samus.png"
+	if ResourceLoader.exists(path):
+		cutin_portrait.texture = load(path)
 	cutin_stripes.col = suit_color
 	cutin_stripes.queue_redraw()
 	cutin_name.text = title
 	cutin_name.add_theme_color_override("font_color", suit_color.lightened(0.35))
 	cutin_layer.visible = true
 	cutin_t = 0.0
+	cutin_dismissed = false
+	cutin_hint.visible = false
 	cutin_portrait.position.x = -520.0
 	cutin_name.position.x = W + 40.0
+
+
+func dismiss_cutin() -> void:
+	cutin_dismissed = true
 
 
 func hide_cutin() -> void:
 	cutin_layer.visible = false
 	cutin_t = -1.0
+	cutin_dismissed = false
 
 
 func show_banner(text: String) -> void:

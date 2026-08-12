@@ -703,7 +703,7 @@ func _drop_bomb(w: WeaponInst, s: Stats) -> void:
 
 func _explode_bomb(b: Bomb) -> void:
 	sfx.play("explosion")
-	game.add_shake(2.0)
+	game.add_shake(1.0)   # 高頻爆炸，震動壓低
 	var def: Dictionary = WeaponData.WEAPONS[b.weapon_id]
 	var evo: Dictionary = def["evo"]
 	var color := Color(String(evo["color"])) if b.evolved else Color(String(def["color"]))
@@ -759,7 +759,7 @@ func _update_novas(dt: float) -> void:
 			continue
 		novas.remove_at(i)
 		sfx.play("explosion")
-		game.add_shake(4.0)
+		# 強力炸彈不震動：Lv高時9連發等於整場狂震，傷眼（玩家回饋移除）
 		var def: Dictionary = WeaponData.WEAPONS[n.weapon_id]
 		var evo: Dictionary = def["evo"]
 		var color := Color(String(evo["color"])) if n.evolved else Color(String(def["color"]))
@@ -837,7 +837,7 @@ func _drop_mine(w: WeaponInst, s: Stats) -> void:
 
 func _explode_mine(m: MineUnit) -> void:
 	sfx.play("explosion")
-	game.add_shake(3.0)
+	game.add_shake(1.5)   # 高頻爆炸，震動壓低
 	var def: Dictionary = WeaponData.WEAPONS[m.weapon_id]
 	var evo: Dictionary = def["evo"]
 	var color := Color(String(evo["color"])) if m.evolved else Color(String(def["color"]))

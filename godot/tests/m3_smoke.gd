@@ -25,9 +25,9 @@ func _process(delta: float) -> bool:
 	if game == null:
 		print("[M3TEST] FAIL: game scene missing")
 		return true
-	# 快轉進化公告
-	if game.announce_time > 0.12:
-		game.announce_time = 0.12
+	# 快轉公告（M5.2起公告改任意鍵繼續，測試用debug skip）
+	if game.announce_state != "":
+		game.debug_skip_announce()
 	# 防死亡（接觸傷害會累積）
 	if game.player.hp < 40.0:
 		game.player.hp = game.player.max_hp
@@ -43,7 +43,7 @@ func _process(delta: float) -> bool:
 				e.hp = 5000.0
 		# 直接灌經驗測升級選單流程（玩家不動撿不到晶石）
 		xp_timer -= delta
-		if xp_timer <= 0.0 and not game.menu_open and game.announce_time <= 0.0:
+		if xp_timer <= 0.0 and not game.menu_open and game.announce_state == "":
 			xp_timer = 1.2
 			game._gain_xp(40.0)
 			# 把敵人拉到玩家附近：保證地雷觸發（重力井）與脈衝命中（共鳴連鎖）

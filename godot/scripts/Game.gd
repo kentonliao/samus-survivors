@@ -41,8 +41,11 @@ var levelups_queued := 0
 var menu_open := false
 var dead := false
 var magnet_radius := 90.0
-var announce_time := 0.0          # 公告倒數（>0 時遊戲暫停）
-var announce_action := ""         # 公告結束時的動作："" / midboss / queen
+var announce_state := ""          # 公告狀態機："" 無 / wait 等任意鍵 / closing cut-in滑出收尾
+var announce_min_t := 0.0         # 最短顯示時間（防止手滑瞬間跳過）
+var announce_close_t := 0.0
+var announce_input_ready := false # 需先放開所有按鍵再按（防移動鍵按著就跳過）
+var announce_action := ""         # 公告結束時的動作："" / midboss / queen / cutin
 var announce_entry := {}          # midboss 公告攜帶的 BOSS_TABLE 條目
 var evolution_queue: Array = []   # 待公告的 WeaponSystem.WeaponInst
 var final_boss_pending := false   # QUEEN 待觸發（6把全進化或25分保底）
@@ -107,22 +110,21 @@ func _process(delta: float) -> void:
 		if Input.is_physical_key_pressed(KEY_R):
 			get_tree().reload_current_scene()
 		return
-	if announce_time > 0.0:
-		# 公告期間全場暫停（進化/頭目警告共用）
-		announce_time -= delta
-		if announce_time <= 0.0:
-			hud.hide_announce()
-			var action := announce_action
-			announce_action = ""
-			match action:
-				"midboss":
-					boss_sys.start_boss_battle(announce_entry)
-					announce_entry = {}
-				"queen":
-					boss_sys.spawn_final_boss()
-				"cutin":
-					hud.hide_cutin()
-			_proceed_after_menus()
+	if announce_state != "":
+		# 公告期間全場暫停；按任意鍵繼續（玩家要求：不用計時，留足觀看時間）
+		if announce_state == "closing":
+			announce_close_t -= delta
+			if announce_close_t <= 0.0:
+				announce_state = ""
+				announce_action = ""
+				hud.hide_cutin()
+				_proceed_after_menus()
+			return
+		announce_min_t -= delta
+		if not Input.is_anything_pressed():
+			announce_input_ready = true   # 需先全放開（防移動鍵按住直接跳過）
+		if announce_min_t <= 0.0 and announce_input_ready and Input.is_anything_pressed():
+			_finish_announce()
 		return
 	if menu_open:
 		return
@@ -156,7 +158,7 @@ func _process(delta: float) -> void:
 	if boss_sys.pending_mid_boss.size() > 0 and boss_sys.boss_battle == null:
 		var entry: Dictionary = boss_sys.pending_mid_boss
 		boss_sys.pending_mid_boss = {}
-		_show_boss_announce(String(entry["name"]), "巨大生物反應接近中，雜兵生產已停止。迎擊！", 3.0, "midboss", entry)
+		_show_boss_announce(String(entry["name"]), "巨大生物反應接近中，雜兵生產已停止。迎擊！", "midboss", entry)
 		return
 	# 頭目連戰：QUEEN 觸發時若還有中頭目未登場，依序全部登場，全數擊破後 QUEEN 才現身
 	if final_boss_pending and boss_sys.boss_battle == null and boss_sys.pending_mid_boss.is_empty():
@@ -166,7 +168,7 @@ func _process(delta: float) -> void:
 			boss_sys.pending_mid_boss = next
 			return
 		final_boss_pending = false
-		_show_boss_announce("QUEEN METROID", "動力服已完全覺醒，星球深處的最終威脅甦醒了。擊敗它，證明薩姆斯的極限。", 3.4, "queen", {})
+		_show_boss_announce("QUEEN METROID", "動力服已完全覺醒，星球深處的最終威脅甦醒了。擊敗它，證明薩姆斯的極限。", "queen", {})
 		return
 	if levelups_queued > 0:
 		_open_levelup()
@@ -174,6 +176,47 @@ func _process(delta: float) -> void:
 
 func add_shake(a: float) -> void:
 	shake_amt = minf(10.0, shake_amt + a)
+
+
+func _begin_announce(action: String, min_t: float) -> void:
+	announce_state = "wait"
+	announce_action = action
+	announce_min_t = min_t
+	announce_input_ready = false
+	player.set_process(false)
+
+
+func _finish_announce() -> void:
+	if announce_action == "cutin":
+		# cut-in 有滑出動畫：先觸發滑出，短暫收尾後才繼續流程
+		hud.dismiss_cutin()
+		announce_state = "closing"
+		announce_close_t = 0.4
+		return
+	hud.hide_announce()
+	var action := announce_action
+	announce_action = ""
+	announce_state = ""
+	match action:
+		"midboss":
+			boss_sys.start_boss_battle(announce_entry)
+			announce_entry = {}
+		"queen":
+			boss_sys.spawn_final_boss()
+	_proceed_after_menus()
+
+
+func debug_skip_announce() -> void:
+	# 測試/自動化專用：立即結束目前公告（跳過輸入等待與滑出動畫）
+	if announce_state == "":
+		return
+	if announce_action == "cutin":
+		announce_action = ""
+		announce_state = ""
+		hud.hide_cutin()
+		_proceed_after_menus()
+		return
+	_finish_announce()
 
 
 # ---------- 難度 ----------
@@ -488,10 +531,8 @@ func _proceed_after_menus() -> void:
 		# 變身 cut-in 優先於進化公告（變身必然伴隨第2/4/6把進化）
 		var tier := pending_cutin
 		pending_cutin = ""
-		hud.show_cutin(Color(String(SUIT_PRIMARY[tier])), String(SUIT_LABELS[tier]) + " 起動！")
-		announce_time = GameHud.CUTIN_TOTAL
-		announce_action = "cutin"
-		player.set_process(false)
+		hud.show_cutin(tier, Color(String(SUIT_PRIMARY[tier])), String(SUIT_LABELS[tier]) + " 起動！")
+		_begin_announce("cutin", 1.0)
 		return
 	if evolution_queue.size() > 0:
 		var w: WeaponSystem.WeaponInst = evolution_queue.pop_front()
@@ -507,8 +548,7 @@ func _show_evolution(w: WeaponSystem.WeaponInst) -> void:
 	var def: Dictionary = WeaponData.WEAPONS[w.id]
 	var evo: Dictionary = def["evo"]
 	hud.show_evolution(w.id, String(evo["name"]), String(evo["desc"]))
-	announce_time = 2.2
-	player.set_process(false)
+	_begin_announce("", 0.5)
 	sfx.play("evolve")
 	fx.spawn_burst(player.position, Color(String(evo["color"])), 50, 240.0, 1.0)
 	hud.refresh_slots(weapon_sys)
@@ -535,12 +575,10 @@ func _check_suit_tier() -> void:
 		final_boss_pending = true   # QUEEN METROID（含頭目連戰）由 _process 消化
 
 
-func _show_boss_announce(title: String, flavor: String, duration: float, action: String, entry: Dictionary) -> void:
+func _show_boss_announce(title: String, flavor: String, action: String, entry: Dictionary) -> void:
 	hud.show_boss_announce(title, flavor)
-	announce_time = duration
-	announce_action = action
+	_begin_announce(action, 0.8)
 	announce_entry = entry
-	player.set_process(false)
 	sfx.play("alert")
 
 

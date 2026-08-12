@@ -37,9 +37,9 @@ func _process(delta: float) -> bool:
 		print("[M4TEST] TIMEOUT at stage=" + stage)
 		_report()
 		return true
-	# 快轉公告
-	if game.announce_time > 0.15:
-		game.announce_time = 0.15
+	# 快轉公告（M5.2起公告改任意鍵繼續，測試用debug skip）
+	if game.announce_state != "":
+		game.debug_skip_announce()
 	# 防死亡
 	game.player.hp = game.player.max_hp
 	# 自動選卡（M5.1起用 Hud.card_buttons）
