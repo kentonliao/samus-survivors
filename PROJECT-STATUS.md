@@ -372,7 +372,16 @@
   注意 draw() 會逐幀覆寫 hpBar 內聯樣式、已同步改）、頭目警告紅面板閃爍、
   進化公告粉紅標題面板、勝利金面板/失敗紅面板。
   computed-style 驗證全部生效、零錯誤。
-  **音效的實際聽感需玩家實測**（無頭測試聽不到），若音量/音色不對可調 RECIPES）
+  **音效的實際聽感需玩家實測**（無頭測試聽不到），若音量/音色不對可調 RECIPES。
+  **v1.9.1（第二十輪，依10項回饋修正）**：①開始畫面說明改透明深底（橘面板太像軟體對話框）
+  ②卡片重製=深色透底+紫光條框+標題騎上框線+hover橘色「啟用」狀態（參考圖的黃底=啟用態）
+  ③提示文字溢出XP框修正（xp-wrap上移/hint縮小） ⑥選卡確認音改雙音上行更醒目
+  ⑦警報改4循環鋸齒波警笛、中頭目警告1.8→3.0s、QUEEN 2.6→3.4s ⑧總音量0.22→0.45
+  ⑨磁力地雷萊姆綠→琥珀金#ffb830（苔蘚地上隱形問題） ⑩進化武器配色去白化：
+  nova金橘/absoluteZero冰藍/plasmaStorm洋紅/prismatic檸黃/superMissile橘紅/chainReaction橙/
+  zeroCountdown亮黃/shinespark粉紫/chainLightning電光青/gravityWell紫/resonance青綠。
+  **待辦（玩家已提，下輪候選）**：④武器/被動20個圖示從emoji重繪為Metroid風像素圖
+  （可用字母矩陣+離屏canvas轉dataURL塞進DOM）；⑩進化武器特效「更酷炫」的深度重設計）
 
 ---
 

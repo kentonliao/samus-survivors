@@ -48,7 +48,7 @@
   #timer-txt{ font-family:'Press Start 2P'; font-size:19px; color:var(--sm-orange); text-shadow:2px 2px 0 #000; }
   #depth-txt{ font-family:'Press Start 2P'; font-size:8px; color:#c8c8d8; margin-top:5px; letter-spacing:1px; }
 
-  #xp-wrap{ bottom:14px; left:50%; transform:translateX(-50%); width:420px; text-align:center; }
+  #xp-wrap{ bottom:26px; left:50%; transform:translateX(-50%); width:420px; text-align:center; }
   #xp-bar-outer{ height:8px; background:#0a0612; border:1px solid #000; margin-top:4px;}
   #xp-bar-inner{ height:100%; width:0%; transition:width 0.2s ease;
     background:repeating-linear-gradient(90deg, var(--sm-green) 0 6px, #2a8830 6px 7px, transparent 7px 9px); }
@@ -79,10 +79,8 @@
   /* SM式橘色面板：黑字、亮緣+暗緣雙框、硬陰影 */
   .sm-panel{ background:var(--sm-orange); color:#180c00; border:3px solid #000;
     box-shadow:0 0 0 2px var(--sm-orange-hi) inset, 0 0 0 5px var(--sm-orange-dk) inset, 5px 5px 0 rgba(0,0,0,0.8); }
-  .flavor{ margin-top:26px; max-width:560px; font-size:14px; line-height:1.9; color:#241200;
-    background:var(--sm-orange); border:3px solid #000; box-shadow:0 0 0 2px var(--sm-orange-hi) inset, 5px 5px 0 rgba(0,0,0,0.8);
-    padding:16px 24px; text-align:left; }
-  .flavor b{ color:#7a0800; }
+  .flavor{ margin-top:26px; max-width:560px; font-size:14px; line-height:1.9; color:var(--text-dim); text-align:center; }
+  .flavor b{ color:var(--sm-orange); }
   .start-btn{ margin-top:34px; pointer-events:all; cursor:pointer; font-family:'Press Start 2P'; font-size:13px;
     background:var(--sm-orange); color:#180c00; padding:14px 30px; border:3px solid #000;
     box-shadow:0 0 0 2px var(--sm-orange-hi) inset, 4px 4px 0 rgba(0,0,0,0.8); }
@@ -111,20 +109,24 @@
   #levelup-title{ font-family:'Press Start 2P'; font-size:16px; color:#fff; margin-bottom:26px; text-shadow:2px 2px 0 #000;
     background:#000; border:2px solid #fff; padding:10px 26px; letter-spacing:2px; }
   #cards{ display:flex; gap:18px; pointer-events:all; flex-wrap:wrap; justify-content:center; max-width:920px;}
-  /* SM式橘色裝備面板卡片 */
-  .card{ width:224px; min-height:220px; background:var(--sm-orange); border:3px solid #000; padding:16px 12px; cursor:pointer;
-    display:flex; flex-direction:column; align-items:center;
-    box-shadow:0 0 0 2px var(--sm-orange-hi) inset, 0 0 0 5px var(--sm-orange-dk) inset, 5px 5px 0 rgba(0,0,0,0.8);
-    transition:transform 0.1s ease; image-rendering:pixelated; }
-  .card:hover{ transform:translate(-2px,-4px); background:var(--sm-orange-hi);
-    box-shadow:0 0 0 2px #fff inset, 0 0 0 5px var(--sm-orange-dk) inset, 7px 9px 0 rgba(0,0,0,0.8); }
-  .card-emoji{ font-size:34px; margin-bottom:10px; filter:drop-shadow(2px 2px 0 rgba(0,0,0,0.4)); }
-  .card-name{ font-family:'Press Start 2P'; font-size:12px; color:#180c00; text-align:center; line-height:1.6; margin-bottom:8px; }
+  /* SM式裝備框卡片：平常深色透底+紫色光條框、標題騎在上框線上；hover=橘色「啟用」狀態 */
+  .card{ width:224px; min-height:210px; position:relative; background:rgba(6,2,14,0.92);
+    border:2px solid #8a48d8; padding:26px 12px 14px; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; margin-top:12px;
+    box-shadow:0 0 12px rgba(150,80,255,0.45), inset 0 0 18px rgba(120,60,200,0.12);
+    transition:border-color 0.1s ease, box-shadow 0.1s ease, background 0.1s ease; }
+  .card:hover{ border-color:var(--sm-orange); background:rgba(40,22,4,0.92);
+    box-shadow:0 0 16px rgba(232,160,32,0.55), inset 0 0 18px rgba(232,160,32,0.15); }
+  .card-name{ position:absolute; top:-9px; left:50%; transform:translateX(-50%); white-space:nowrap;
+    font-family:'Press Start 2P'; font-size:11px; color:var(--sm-orange); background:#05010a; padding:2px 9px; line-height:1.4; }
+  .card:hover .card-name{ color:#ffd878; }
   .card-name::before{ content:'● '; color:var(--sm-red); }
-  .card-lv{ font-family:'Press Start 2P'; font-size:9px; color:#7a0800; margin-bottom:8px; }
-  .card-desc{ font-size:13px; color:#402400; line-height:1.6; text-align:center; }
-  .card.newk{ background:#f8c040; }
-  .card.newk .card-name::before{ content:'★ '; color:#7a0800; }
+  .card-emoji{ font-size:34px; margin:8px 0 10px; filter:drop-shadow(2px 2px 0 rgba(0,0,0,0.5)); }
+  .card-lv{ font-family:'Press Start 2P'; font-size:9px; color:var(--sm-green); margin-bottom:10px; }
+  .card-desc{ font-size:13px; color:#c8cede; line-height:1.7; text-align:center; }
+  .card.newk{ border-color:var(--gold); box-shadow:0 0 12px rgba(255,215,106,0.5), inset 0 0 18px rgba(255,215,106,0.1); }
+  .card.newk .card-name{ color:var(--gold); }
+  .card.newk .card-name::before{ content:'★ '; color:var(--gold); }
 
   #evo-overlay{ position:absolute;inset:0; display:flex;flex-direction:column;align-items:center;justify-content:center;
     background-color:rgba(4,2,8,0.93); z-index:25; text-align:center;
@@ -138,7 +140,7 @@
     border:3px solid #000; box-shadow:0 0 0 2px var(--sm-orange-hi) inset, 4px 4px 0 rgba(0,0,0,0.8); padding:12px 20px; }
 
   #flash{ position:absolute;top:0;left:0;width:100%;height:100%; background:#fff; opacity:0; pointer-events:none; z-index:15; }
-  #controls-hint{ position:absolute; bottom:8px; left:50%; transform:translateX(-50%); font-size:12px; color:var(--text-dim); z-index:5; pointer-events:none; letter-spacing:1px; }
+  #controls-hint{ position:absolute; bottom:4px; left:50%; transform:translateX(-50%); font-size:10px; color:var(--text-dim); z-index:5; pointer-events:none; letter-spacing:1px; white-space:nowrap; }
   #version-tag{ position:absolute; bottom:10px; left:14px; font-size:11px; color:var(--text-dim); opacity:0.6; letter-spacing:1px; }
 </style>
 </head>
@@ -230,7 +232,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = 'v1.9 · 2026-08-12 · 8-bit音效系統＋UI像素風重製（Super Metroid配色）';
+const GAME_VERSION = 'v1.9.1 · 2026-08-12 · UI回饋修正＋警報強化＋進化配色去白化';
 const W = 960, H = 600;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -247,7 +249,7 @@ const SFX = (function(){
     if(ac) return;
     try{
       ac = new (window.AudioContext||window.webkitAudioContext)();
-      master = ac.createGain(); master.gain.value = 0.22; master.connect(ac.destination);
+      master = ac.createGain(); master.gain.value = 0.45; master.connect(ac.destination);
     }catch(e){ ac = null; }
   }
   function beep(type, f0, f1, dur, vol, delay){
@@ -275,10 +277,10 @@ const SFX = (function(){
     hit:      {min:70,  fn:()=>noise(0.05, 0.09, 0, 2200)},
     gem:      {min:60,  fn:()=>{ beep('square', 1250, undefined, 0.04, 0.08); beep('square', 1680, undefined, 0.05, 0.08, 0.045); }},
     levelup:  {min:300, fn:()=>{ [523,659,784,1046].forEach((f,i)=>beep('square', f, undefined, 0.09, 0.14, i*0.07)); }},
-    select:   {min:100, fn:()=>beep('square', 700, 1000, 0.06, 0.12)},
+    select:   {min:100, fn:()=>{ beep('square', 880, undefined, 0.07, 0.2); beep('square', 1320, undefined, 0.12, 0.2, 0.07); }},
     evolve:   {min:300, fn:()=>{ [392,523,659,784,1046,1318].forEach((f,i)=>beep('square', f, undefined, 0.1, 0.13, i*0.08)); noise(0.5, 0.05, 0.4, 3000); }},
     suit:     {min:300, fn:()=>{ [659,523,784,1046].forEach((f,i)=>beep('triangle', f, undefined, 0.14, 0.18, i*0.11)); }},
-    alert:    {min:400, fn:()=>{ for(let i=0;i<3;i++){ beep('square', 330, undefined, 0.14, 0.13, i*0.3); beep('square', 220, undefined, 0.14, 0.13, i*0.3+0.15); } }},
+    alert:    {min:400, fn:()=>{ for(let i=0;i<4;i++){ beep('sawtooth', 392, undefined, 0.3, 0.2, i*0.62); beep('sawtooth', 262, undefined, 0.3, 0.2, i*0.62+0.31); } }},
     explosion:{min:120, fn:()=>{ noise(0.3, 0.15, 0, 700); beep('triangle', 130, 40, 0.3, 0.13); }},
     hurt:     {min:200, fn:()=>beep('sawtooth', 220, 70, 0.16, 0.16)},
     bosskill: {min:500, fn:()=>{ noise(0.7, 0.2, 0, 500); beep('triangle', 100, 30, 0.7, 0.17); [784,659,1046].forEach((f,i)=>beep('square', f, undefined, 0.12, 0.12, 0.5+i*0.1)); }},
@@ -1728,12 +1730,12 @@ const WEAPON_ORDER = ['powerBeam','iceBeam','waveBeam','plasmaBeam','spazerBeam'
 const WEAPON_DEFS = {
   powerBeam:{ name:'力量光束', emoji:'⚡', category:'projectile', color:'#dffcff', shape:'bolt',
     baseDmg:8, dmgPerLv:3.2, baseCd:0.42, cdPerLv:-0.03, minCd:0.15, baseCount:1, countEvery:2, basePierce:1, speed:520,
-    evoPartner:'overloadCapacitor', evo:{ id:'novaBeam', name:'Nova Beam 新星光束', emoji:'🌟', color:'#fff7d6',
+    evoPartner:'overloadCapacitor', evo:{ id:'novaBeam', name:'Nova Beam 新星光束', emoji:'🌟', color:'#ffc830',
       desc:'冷卻大幅縮短，化為高頻貫穿雷射連射。', dmgMult:2.2, cdMult:0.5, pierceAdd:6 } },
   iceBeam:{ name:'冰凍光束', emoji:'❄️', category:'projectile', color:'#8fe8ff', shape:'shard',
     baseDmg:6, dmgPerLv:2.6, baseCd:0.5, cdPerLv:-0.025, minCd:0.18, baseCount:1, countEvery:3, basePierce:1, speed:420,
     slowBase:0.28, slowPerLv:0.02,
-    evoPartner:'piercingCore', evo:{ id:'absoluteZero', name:'Absolute Zero 絕對零度', emoji:'🧊', color:'#eafcff',
+    evoPartner:'piercingCore', evo:{ id:'absoluteZero', name:'Absolute Zero 絕對零度', emoji:'🧊', color:'#5cd8ff',
       desc:'貫穿全場並凍結敵人，凍結目標死亡時引發冰爆。', dmgMult:2.0, pierceAdd:8, freeze:true, shatterAoe:true } },
   waveBeam:{ name:'波動光束', emoji:'〰️', category:'directional', color:'#c86bff', wavy:true, shape:'ribbon',
     baseDmg:7, dmgPerLv:2.8, baseCd:0.48, cdPerLv:-0.025, minCd:0.2, baseCount:1, countEvery:1, basePierce:5, speed:480,
@@ -1741,39 +1743,39 @@ const WEAPON_DEFS = {
       desc:'光束陣列加密，自動旋轉掃射全場。', dmgMult:1.8, cdMult:0.7, countAdd:4, pierceAdd:6, spinPerShot:0.7 } },
   plasmaBeam:{ name:'電漿光束', emoji:'☢️', category:'beam_continuous', color:'#ff8fe0', range:260,
     baseDmg:15, dmgPerLv:6.5,
-    evoPartner:'overloadCapacitor', evo:{ id:'plasmaStorm', name:'Plasma Storm 電漿風暴', emoji:'🌀', color:'#ffd6f5', category:'orbit_field',
+    evoPartner:'overloadCapacitor', evo:{ id:'plasmaStorm', name:'Plasma Storm 電漿風暴', emoji:'🌀', color:'#ff4fd8', category:'orbit_field',
       desc:'化為環繞玩家的旋轉電漿力場，360度持續灼燒。', dmgMult:1.1, radius:130 } },
   spazerBeam:{ name:'分光光束', emoji:'✳️', category:'projectile', color:'#ffe27a', spreadAngle:0.4, shape:'star',
     baseDmg:6, dmgPerLv:2.3, baseCd:0.55, cdPerLv:-0.028, minCd:0.2, baseCount:3, countEvery:2, basePierce:1, speed:480,
-    evoPartner:'multiLockModule', evo:{ id:'prismaticSpazer', name:'Prismatic Spazer 稜光散射', emoji:'💠', color:'#fff0c0', category:'radial_burst',
+    evoPartner:'multiLockModule', evo:{ id:'prismaticSpazer', name:'Prismatic Spazer 稜光散射', emoji:'💠', color:'#ffe14f', category:'radial_burst',
       desc:'化為全圓周彈幕齊射，如綻放的稜鏡光環。', dmgMult:1.6 } },
   missile:{ name:'飛彈發射器', emoji:'🚀', category:'homing', color:'#ffb03d',
     baseDmg:20, dmgPerLv:9, baseCd:1.1, cdPerLv:-0.07, minCd:0.4, baseCount:1, countEvery:2, maxCount:4, splashRadius:34,
-    evoPartner:'piercingCore', evo:{ id:'superMissileBarrage', name:'Super Missile Barrage 超級飛彈群', emoji:'🎇', color:'#fff0dc',
+    evoPartner:'piercingCore', evo:{ id:'superMissileBarrage', name:'Super Missile Barrage 超級飛彈群', emoji:'🎇', color:'#ff7a30',
       desc:'齊射式貫穿飛彈群，爆炸後產生二次分裂彈頭。', dmgMult:1.8, countAdd:3, splashRadiusAdd:50 } },
   bombTrail:{ name:'炸彈軌跡', emoji:'💣', category:'placed_bomb', color:'#ffcf3d',
     baseDmg:13, dmgPerLv:5.5, dropInterval:0.65, dropIntervalPerLv:-0.03, fuseTime:0.8, blastRadius:42,
-    evoPartner:'criticalSensor', evo:{ id:'chainReaction', name:'Chain Reaction 連鎖爆破', emoji:'🧨', color:'#ffe6a0',
+    evoPartner:'criticalSensor', evo:{ id:'chainReaction', name:'Chain Reaction 連鎖爆破', emoji:'🧨', color:'#ffae3c',
       desc:'炸彈間會互相引爆，一觸即發連環大爆炸。', dmgMult:1.6, blastRadiusAdd:20, chainTrigger:true } },
   powerBomb:{ name:'強力炸彈', emoji:'☄️', category:'delayed_nova', color:'#ff5b3d',
     baseDmg:42, dmgPerLv:17, cooldown:4.0, cdPerLv:-0.2, minCooldown:1.6, radius:110, radiusPerLv:6, delay:0.6,
-    evoPartner:'reserveTank', evo:{ id:'zeroCountdown', name:'Zero Countdown 歸零倒數', emoji:'💥', color:'#ffffff',
+    evoPartner:'reserveTank', evo:{ id:'zeroCountdown', name:'Zero Countdown 歸零倒數', emoji:'💥', color:'#fff340',
       desc:'清屏核彈，引爆瞬間造成大量傷害並回復能量。', dmgMult:2.0, radiusAdd:80, healOnDetonate:0.15, countAdd:2 } },
   screwAttack:{ name:'螺旋攻擊', emoji:'🌀', category:'orbit_aura', color:'#c58bff',
     baseDmg:11, dmgPerLv:4.3, radius:55, radiusPerLv:3,
-    evoPartner:'boosterCoil', evo:{ id:'shinesparkFury', name:'Shinespark Fury 閃光衝刺・狂', emoji:'✨', color:'#ffe9ff',
+    evoPartner:'boosterCoil', evo:{ id:'shinesparkFury', name:'Shinespark Fury 閃光衝刺・狂', emoji:'✨', color:'#ff7ae0',
       desc:'能量光環大幅擴張，並定期爆發強力衝擊波。', dmgMult:1.8, radiusAdd:35, pulseBurst:true } },
   grappleBeam:{ name:'抓鉤光束', emoji:'⛓️', category:'chain', color:'#4fd8ff',
     baseDmg:9, dmgPerLv:3.6, baseCd:0.6, cdPerLv:-0.02, chainCount:2, chainCountEvery:3, chainRange:200,
-    evoPartner:'multiLockModule', evo:{ id:'chainLightningArray', name:'Chain Lightning Array 連鎖電網', emoji:'⚡', color:'#eaffff',
+    evoPartner:'multiLockModule', evo:{ id:'chainLightningArray', name:'Chain Lightning Array 連鎖電網', emoji:'⚡', color:'#6ce8ff',
       desc:'連鎖跳數大幅提升，近乎連結全場敵人。', dmgMult:1.7, chainCountAdd:6 } },
-  spiderMine:{ name:'磁力地雷', emoji:'🕸️', category:'mine', color:'#a3e635',
+  spiderMine:{ name:'磁力地雷', emoji:'🕸️', category:'mine', color:'#ffb830',
     baseDmg:26, dmgPerLv:11, dropInterval:1.3, dropIntervalPerLv:-0.06, triggerRadius:42, blastRadius:56, maxMines:3, maxMinesEvery:3,
-    evoPartner:'magnetCore', evo:{ id:'gravityWellMine', name:'Gravity Well Mine 重力井地雷', emoji:'🕳️', color:'#e0c8ff',
+    evoPartner:'magnetCore', evo:{ id:'gravityWellMine', name:'Gravity Well Mine 重力井地雷', emoji:'🕳️', color:'#a860ff',
       desc:'觸發時先形成黑洞吸聚敵人，再引爆大範圍傷害。', dmgMult:1.8, blastRadiusAdd:25, pullEffect:true } },
   echoPulse:{ name:'音波脈衝', emoji:'📡', category:'pulse', color:'#7ff0ff',
     baseDmg:15, dmgPerLv:5.5, cooldown:1.6, cdPerLv:-0.08, minCooldown:0.7, maxRadius:140, radiusPerLv:6,
-    evoPartner:'criticalSensor', evo:{ id:'resonanceCascade', name:'Resonance Cascade 共鳴連鎖', emoji:'🔊', color:'#e0fffb',
+    evoPartner:'criticalSensor', evo:{ id:'resonanceCascade', name:'Resonance Cascade 共鳴連鎖', emoji:'🔊', color:'#3ee8c8',
       desc:'脈衝命中敵人時有機率觸發額外連鎖脈衝。', dmgMult:1.6, chainPulse:true } },
 };
 
@@ -2216,7 +2218,7 @@ function drawMines(){
   for(const m of mines){
     ctx.save(); ctx.translate(m.x,m.y);
     ctx.setLineDash([3,4]);
-    ctx.strokeStyle = m.evolved ? 'rgba(224,200,255,0.35)' : 'rgba(163,230,53,0.3)';
+    ctx.strokeStyle = m.evolved ? 'rgba(224,200,255,0.4)' : 'rgba(255,184,48,0.45)';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(0,0,m.triggerRadius,0,Math.PI*2); ctx.stroke();
     ctx.setLineDash([]);
@@ -2233,7 +2235,7 @@ function drawMines(){
     ctx.beginPath();
     for(let i=0;i<spikes*2;i++){ const rad=(i%2===0?baseR:baseR*0.45)+1.6; const a=(Math.PI/spikes)*i+spin; const px=Math.cos(a)*rad, py=Math.sin(a)*rad; if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
     ctx.closePath(); ctx.fill();
-    ctx.fillStyle = m.pulling ? '#e0c8ff' : (m.evolved?'#c8a0ff':'#a3e635');
+    ctx.fillStyle = m.pulling ? '#e0c8ff' : (m.evolved?'#c8a0ff':'#ffb830');
     ctx.beginPath();
     for(let i=0;i<spikes*2;i++){ const rad=i%2===0?baseR:baseR*0.45; const a=(Math.PI/spikes)*i+spin; const px=Math.cos(a)*rad, py=Math.sin(a)*rad; if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
     ctx.closePath(); ctx.fill();
@@ -3260,7 +3262,7 @@ function showFinalBossAnnouncement(){
     bossAnnounceEl.classList.add('hidden');
     spawnFinalBoss();
     proceedAfterMenus();
-  }, 2600);
+  }, 3400);
 }
 // 中頭目登場公告（沿用威脅偵測畫面，短暫停頓後頭目滑入）
 function showMidBossAnnouncement(entry){
@@ -3275,7 +3277,7 @@ function showMidBossAnnouncement(entry){
     bossAnnounceEl.classList.add('hidden');
     startBossBattle(entry);
     proceedAfterMenus();
-  }, 1800);
+  }, 3000);
 }
 function spawnFinalBoss(){
   const diff = getDifficulty(elapsed);
