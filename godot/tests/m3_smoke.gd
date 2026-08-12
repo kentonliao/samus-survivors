@@ -31,13 +31,10 @@ func _process(delta: float) -> bool:
 	# 防死亡（接觸傷害會累積）
 	if game.player.hp < 40.0:
 		game.player.hp = game.player.max_hp
-	# 模擬點擊升級卡（M5起卡片在 Hud.cards_box）
-	if game.menu_open and game.hud.cards_box != null:
-		for c in game.hud.cards_box.get_children():
-			if c is Button:
-				cards_picked += 1
-				(c as Button).pressed.emit()
-				break
+	# 模擬點擊升級卡（M5.1起用 Hud.card_buttons）
+	if game.menu_open and game.hud.card_buttons.size() > 0:
+		cards_picked += 1
+		game.hud.card_buttons[0].pressed.emit()
 	if phase >= 1:
 		# 敵人變坦：讓它們活著走近玩家，測連鎖/地雷/脈衝/凍結近戰路徑
 		for e in game.enemies:

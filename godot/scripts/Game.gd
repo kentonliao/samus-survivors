@@ -11,6 +11,7 @@ const GEM_CAP := 45
 
 const SUIT_LABELS := {"power": "POWER SUIT", "varia": "VARIA SUIT", "gravity": "GRAVITY SUIT", "hyper": "HYPER MODE"}
 const SUIT_HIGHLIGHT := {"power": "#eef30c", "varia": "#ffcf3d", "gravity": "#4fd8ff", "hyper": "#ffffff"}
+const SUIT_PRIMARY := {"power": "#e6201a", "varia": "#ff6a1a", "gravity": "#7b2fbe", "hyper": "#ffd400"}
 
 # id: [introduceAt, hp, dmg, spd, r, weight, flyer, dash, explode]
 const ENEMY_TYPES := {
@@ -49,6 +50,9 @@ var final_boss_triggered := false # 只觸發一次
 var victorious := false
 var shake_amt := 0.0              # 畫面震動強度（爆炸/頭目死亡/變身）
 var m_prev := false               # M鍵靜音去彈跳
+var pending_cutin := ""           # 待播放的變身 cut-in（動力服tier）
+var reroll_left := 3              # 升級選單重選次數（每場3次）
+var banish_left := 3              # 排除次數（每場3次；之後商店系統可加購）
 
 var rng := RandomNumberGenerator.new()
 
@@ -82,6 +86,8 @@ func _ready() -> void:
 	add_child(sfx)
 	hud = GameHud.new()
 	hud.card_picked.connect(_on_card_picked)
+	hud.reroll_requested.connect(_on_reroll)
+	hud.banish_requested.connect(_on_banish)
 	add_child(hud)
 	weapon_sys.sfx = sfx
 	player.sfx = sfx
@@ -114,6 +120,8 @@ func _process(delta: float) -> void:
 					announce_entry = {}
 				"queen":
 					boss_sys.spawn_final_boss()
+				"cutin":
+					hud.hide_cutin()
 			_proceed_after_menus()
 		return
 	if menu_open:
@@ -423,6 +431,18 @@ func _open_levelup() -> void:
 	menu_open = true
 	player.set_process(false)
 	sfx.play("levelup")
+	_present_levelup()
+
+
+func _present_levelup() -> void:
+	# 從當前卡池抽3張呈現（開單/重選/排除後共用）
+	var pool := weapon_sys.build_card_pool()
+	if pool.is_empty():
+		hud.close_levelup()
+		menu_open = false
+		levelups_queued = 0
+		player.set_process(true)
+		return
 	pool.shuffle()
 	var picks: Array = []
 	for i in range(mini(3, pool.size())):
@@ -430,7 +450,24 @@ func _open_levelup() -> void:
 		var info := weapon_sys.card_label(card)
 		info["card"] = card
 		picks.append(info)
-	hud.open_levelup(picks)
+	hud.open_levelup(picks, reroll_left, banish_left)
+
+
+func _on_reroll() -> void:
+	if not menu_open or reroll_left <= 0:
+		return
+	reroll_left -= 1
+	sfx.play("select")
+	_present_levelup()
+
+
+func _on_banish(card: Dictionary) -> void:
+	if not menu_open or banish_left <= 0:
+		return
+	banish_left -= 1
+	weapon_sys.banned[String(card["id"])] = true
+	sfx.play("select")
+	_present_levelup()
 
 
 func _on_card_picked(card: Dictionary) -> void:
@@ -447,6 +484,15 @@ func _on_card_picked(card: Dictionary) -> void:
 
 
 func _proceed_after_menus() -> void:
+	if pending_cutin != "":
+		# 變身 cut-in 優先於進化公告（變身必然伴隨第2/4/6把進化）
+		var tier := pending_cutin
+		pending_cutin = ""
+		hud.show_cutin(Color(String(SUIT_PRIMARY[tier])), String(SUIT_LABELS[tier]) + " 起動！")
+		announce_time = GameHud.CUTIN_TOTAL
+		announce_action = "cutin"
+		player.set_process(false)
+		return
 	if evolution_queue.size() > 0:
 		var w: WeaponSystem.WeaponInst = evolution_queue.pop_front()
 		_show_evolution(w)
@@ -481,9 +527,9 @@ func _check_suit_tier() -> void:
 		player.set_suit(tier)
 		fx.spawn_burst(player.position, Color(String(SUIT_HIGHLIGHT[tier])), 44, 230.0, 0.9)
 		hud.flash_white()   # 變身白閃：刻意保留的稀有慶祝特效（設計決策）
-		hud.show_banner(String(SUIT_LABELS[tier]) + " 起動！")
 		sfx.play("suit")
 		add_shake(4.0)
+		pending_cutin = tier   # 全畫面 cut-in（_proceed_after_menus 播放，優先於進化公告）
 	if cnt >= 6 and not final_boss_triggered:
 		final_boss_triggered = true
 		final_boss_pending = true   # QUEEN METROID（含頭目連戰）由 _process 消化

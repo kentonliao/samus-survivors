@@ -94,6 +94,8 @@ func _draw() -> void:
 		if p.flash:
 			# 命中閃光：鋸齒四芒星，隨生命縮小（HTML參考圖風格）
 			var s := p.size * a
+			if s < 0.8:
+				continue   # 縮到近零的多邊形會三角化失敗
 			var pts := PackedVector2Array()
 			var dirs := [
 				Vector2(s, 0), Vector2(s * 0.22, -s * 0.22), Vector2(0, -s), Vector2(-s * 0.22, -s * 0.22),

@@ -42,12 +42,9 @@ func _process(delta: float) -> bool:
 		game.announce_time = 0.15
 	# 防死亡
 	game.player.hp = game.player.max_hp
-	# 自動選卡（M5起卡片在 Hud.cards_box）
-	if game.menu_open and game.hud.cards_box != null:
-		for c in game.hud.cards_box.get_children():
-			if c is Button:
-				(c as Button).pressed.emit()
-				break
+	# 自動選卡（M5.1起用 Hud.card_buttons）
+	if game.menu_open and game.hud.card_buttons.size() > 0:
+		game.hud.card_buttons[0].pressed.emit()
 	# ---- 旗標收集 ----
 	var bs := game.boss_sys
 	for p in bs.enemy_projectiles:

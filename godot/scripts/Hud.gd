@@ -7,6 +7,8 @@ extends CanvasLayer
 ## 變身白閃（動力服專屬）、橫幅。字體用系統預設（像素字型留待後續資產）。
 
 signal card_picked(card: Dictionary)
+signal reroll_requested
+signal banish_requested(card: Dictionary)
 
 const W := 960.0
 const H := 540.0
@@ -82,6 +84,8 @@ var flash_time := 0.0
 
 var levelup_overlay: Control
 var cards_box: HBoxContainer
+var card_buttons: Array[Button] = []   # 測試/自動化點卡用
+var reroll_btn: Button
 var evo_overlay: Control
 var evo_icon: TextureRect
 var evo_name: Label
@@ -94,6 +98,34 @@ var end_overlay: Control
 var end_title: Label
 var end_stats: Label
 var end_hint: Label
+# 變身 cut-in（玩家提供立繪 ref/cut-in.jpg 去背）
+var cutin_layer: Control
+var cutin_dim: ColorRect
+var cutin_stripes: CutinStripes
+var cutin_portrait: TextureRect
+var cutin_name: Label
+var cutin_t := -1.0            # <0 = 未播放
+const CUTIN_TOTAL := 1.75
+
+
+class CutinStripes:
+	extends Control
+	## 斜切色帶（依動力服主色）：一寬帶+兩細線，-9° 斜角
+	var col := Color.WHITE
+	func _draw() -> void:
+		var skew := 150.0
+		var bands := [[210.0, 190.0, 0.42], [150.0, 16.0, 0.8], [432.0, 10.0, 0.8]]
+		for b in bands:
+			var y0: float = b[0]
+			var hh: float = b[1]
+			var a: float = b[2]
+			var pts := PackedVector2Array([
+				Vector2(-80, y0), Vector2(1100, y0 - skew),
+				Vector2(1100, y0 - skew + hh), Vector2(-80, y0 + hh)])
+			draw_colored_polygon(pts, Color(col.r * 0.55, col.g * 0.55, col.b * 0.55, a))
+		# 亮緣
+		draw_line(Vector2(-80, 205), Vector2(1100, 205 - skew), col, 4.0)
+		draw_line(Vector2(-80, 405), Vector2(1100, 405 - skew), col, 4.0)
 
 
 func _ready() -> void:
@@ -116,6 +148,19 @@ func _process(delta: float) -> void:
 		boss_warn.visible = tms % 600 < 300
 	if end_overlay.visible:
 		end_hint.modulate.a = 1.0 if tms % 1200 < 600 else 0.15
+	# 變身 cut-in 程序動畫：滑入(0.22s)→定格→加速滑出(1.4s起)
+	if cutin_t >= 0.0:
+		cutin_t += delta
+		var in_p := clampf(cutin_t / 0.22, 0.0, 1.0)
+		var ease_in := 1.0 - pow(1.0 - in_p, 3.0)
+		var out_p := clampf((cutin_t - 1.4) / 0.3, 0.0, 1.0)
+		var ease_out := out_p * out_p
+		cutin_portrait.position.x = lerpf(-520.0, 60.0, ease_in) + ease_out * 1200.0
+		cutin_name.position.x = lerpf(W + 40.0, 460.0, ease_in) - ease_out * 1400.0
+		cutin_stripes.position.x = lerpf(-W, 0.0, ease_in) + ease_out * W
+		cutin_dim.modulate.a = minf(in_p, 1.0 - ease_out)
+		if cutin_t >= CUTIN_TOTAL:
+			hide_cutin()
 
 
 # ---------- 樣式工廠 ----------
@@ -213,17 +258,17 @@ func _build() -> void:
 	hp_bar.col = C_PINK
 	hp_bar.col_dark = C_PINK_DK
 	hp_panel.add_child(hp_bar)
-	# 計時面板（右上）
-	var t_panel := _corner_panel(Vector2(W - 14 - 150, 14), Vector2(150, 58))
+	# 計時面板（右上）——寬度需含裕度：文字min寬>框寬時Label會直接溢出框線
+	var t_panel := _corner_panel(Vector2(W - 14 - 196, 14), Vector2(196, 58))
 	add_child(t_panel)
 	timer_label = _label("00:00", 22, C_ORANGE)
-	timer_label.position = Vector2(10, 4)
-	timer_label.size = Vector2(130, 28)
+	timer_label.position = Vector2(12, 4)
+	timer_label.size = Vector2(172, 30)
 	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	t_panel.add_child(timer_label)
 	var depth := _label("CRATERIA SURFACE", 9, Color("#c8c8d8"))
-	depth.position = Vector2(10, 36)
-	depth.size = Vector2(130, 14)
+	depth.position = Vector2(12, 38)
+	depth.size = Vector2(172, 14)
 	depth.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	t_panel.add_child(depth)
 	# XP 面板（底部中央）
@@ -306,6 +351,20 @@ func _build() -> void:
 	cards_box.add_theme_constant_override("separation", 18)
 	cards_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	lv_box.add_child(cards_box)
+	# 重選鈕（卡片列下方，open_levelup 時更新剩餘次數）
+	reroll_btn = Button.new()
+	reroll_btn.text = "↻ 重選這一組"
+	reroll_btn.add_theme_font_size_override("font_size", 14)
+	reroll_btn.focus_mode = Control.FOCUS_NONE
+	var rr_sb := _sb(Color(0.1, 0.06, 0.01, 0.9), C_ORANGE_DK, 2, Color(0, 0, 0, 0), 0, Vector2.ZERO)
+	reroll_btn.add_theme_stylebox_override("normal", rr_sb)
+	var rr_sb_h := _sb(Color(0.2, 0.12, 0.02, 0.95), C_ORANGE, 2, Color(0.91, 0.627, 0.125, 0.4), 5, Vector2.ZERO)
+	reroll_btn.add_theme_stylebox_override("hover", rr_sb_h)
+	reroll_btn.add_theme_color_override("font_color", C_ORANGE)
+	reroll_btn.pressed.connect(_on_reroll)
+	var rr_wrap := CenterContainer.new()
+	rr_wrap.add_child(reroll_btn)
+	lv_box.add_child(rr_wrap)
 	# 進化公告
 	evo_overlay = _overlay_base(Color(0.016, 0.008, 0.031, 0.93), GRID_PURPLE)
 	var evo_center := CenterContainer.new()
@@ -370,6 +429,33 @@ func _build() -> void:
 	end_hint = _label("按 R 再次挑戰", 14, C_TEXT_DIM)
 	end_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	e_box.add_child(end_hint)
+	# 變身 cut-in（白閃之下、其他overlay之上）
+	cutin_layer = Control.new()
+	cutin_layer.size = Vector2(W, H)
+	cutin_layer.visible = false
+	add_child(cutin_layer)
+	cutin_dim = ColorRect.new()
+	cutin_dim.color = Color(0.01, 0.0, 0.03, 0.55)
+	cutin_dim.size = Vector2(W, H)
+	cutin_layer.add_child(cutin_dim)
+	cutin_stripes = CutinStripes.new()
+	cutin_stripes.size = Vector2(W, H)
+	cutin_layer.add_child(cutin_stripes)
+	cutin_portrait = TextureRect.new()
+	if ResourceLoader.exists("res://assets/cutin_samus.png"):
+		cutin_portrait.texture = load("res://assets/cutin_samus.png")
+	# 注意順序：先設 expand_mode 再設 size——預設 EXPAND_KEEP_SIZE 的最小尺寸=貼圖原寸，
+	# 先設 size 會被 clamp 回 740x975（實測踩到）
+	cutin_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	cutin_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	cutin_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	cutin_portrait.size = Vector2(364, 480)   # 740x975 → 高480
+	cutin_portrait.position = Vector2(-520, 40)
+	cutin_layer.add_child(cutin_portrait)
+	cutin_name = _label("", 40, C_GOLD)
+	cutin_name.position = Vector2(W + 40, 240)
+	cutin_name.size = Vector2(520, 60)
+	cutin_layer.add_child(cutin_name)
 	# 變身白閃（最上層）
 	flash_rect = ColorRect.new()
 	flash_rect.color = Color.WHITE
@@ -442,12 +528,44 @@ func _make_slot(icon_id: String, evolved: bool, lv_text: String) -> Panel:
 
 
 # ---------- 升級卡片 ----------
-func open_levelup(picks: Array) -> void:
+func open_levelup(picks: Array, reroll_left: int, banish_left: int) -> void:
 	for c in cards_box.get_children():
 		c.queue_free()
+	card_buttons.clear()
 	for pick in picks:
-		cards_box.add_child(_make_card(pick))
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 8)
+		var btn := _make_card(pick)
+		card_buttons.append(btn)
+		col.add_child(btn)
+		# 排除鈕：本場遊戲不再出現該項目
+		var ban := Button.new()
+		ban.text = "✖ 排除（剩 %d）" % banish_left
+		ban.add_theme_font_size_override("font_size", 12)
+		ban.focus_mode = Control.FOCUS_NONE
+		ban.disabled = banish_left <= 0
+		var ban_sb := _sb(Color(0.1, 0.02, 0.02, 0.9), Color("#7a2020"), 1, Color(0, 0, 0, 0), 0, Vector2.ZERO)
+		ban_sb.set_content_margin_all(5.0)
+		ban.add_theme_stylebox_override("normal", ban_sb)
+		var ban_sb_h := _sb(Color(0.25, 0.05, 0.05, 0.95), C_RED, 1, Color(0, 0, 0, 0), 0, Vector2.ZERO)
+		ban_sb_h.set_content_margin_all(5.0)
+		ban.add_theme_stylebox_override("hover", ban_sb_h)
+		ban.add_theme_color_override("font_color", Color("#e08080"))
+		var card: Dictionary = pick["card"]
+		ban.pressed.connect(_on_banish.bind(card))
+		col.add_child(ban)
+		cards_box.add_child(col)
+	reroll_btn.text = "↻ 重選這一組（剩 %d）" % reroll_left
+	reroll_btn.disabled = reroll_left <= 0
 	levelup_overlay.visible = true
+
+
+func _on_reroll() -> void:
+	reroll_requested.emit()
+
+
+func _on_banish(card: Dictionary) -> void:
+	banish_requested.emit(card)
 
 
 func close_levelup() -> void:
@@ -528,6 +646,22 @@ func show_boss_announce(title: String, flavor: String) -> void:
 func hide_announce() -> void:
 	evo_overlay.visible = false
 	boss_overlay.visible = false
+
+
+func show_cutin(suit_color: Color, title: String) -> void:
+	cutin_stripes.col = suit_color
+	cutin_stripes.queue_redraw()
+	cutin_name.text = title
+	cutin_name.add_theme_color_override("font_color", suit_color.lightened(0.35))
+	cutin_layer.visible = true
+	cutin_t = 0.0
+	cutin_portrait.position.x = -520.0
+	cutin_name.position.x = W + 40.0
+
+
+func hide_cutin() -> void:
+	cutin_layer.visible = false
+	cutin_t = -1.0
 
 
 func show_banner(text: String) -> void:

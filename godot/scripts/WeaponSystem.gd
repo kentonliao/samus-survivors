@@ -145,6 +145,7 @@ var rng := RandomNumberGenerator.new()
 
 var weapons: Array[WeaponInst] = []
 var passives: Array[PassiveInst] = []
+var banned := {}   # id -> true：玩家「排除」的項目，本場不再出現在卡池
 var mods := Mods.new()
 
 var projectiles: Array[Proj] = []
@@ -228,6 +229,8 @@ func build_card_pool() -> Array[Dictionary]:
 	var pool: Array[Dictionary] = []
 	var weapon_full := weapons.size() >= 6
 	for id in WeaponData.WEAPON_ORDER:
+		if banned.has(id):
+			continue
 		var owned := get_weapon(id)
 		if owned == null:
 			if not weapon_full:
@@ -236,6 +239,8 @@ func build_card_pool() -> Array[Dictionary]:
 			pool.append({"kind": "upgradeWeapon", "id": id})
 	var passive_full := passives.size() >= 6
 	for id in WeaponData.PASSIVE_ORDER:
+		if banned.has(id):
+			continue
 		var owned := get_passive(id)
 		if owned == null:
 			if not passive_full:
@@ -1095,12 +1100,32 @@ func _draw_beams() -> void:
 		var def: Dictionary = WeaponData.WEAPONS[w.id]
 		var evo: Dictionary = def["evo"]
 		var col := Color(String(evo["color"])) if w.evolved else Color(String(def["color"]))
-		# 三層光束：寬暈＋色體＋白芯（不用發光濾鏡，透明度分層）
-		draw_line(player.position, t.position, _ca(col, 0.3), 9.0)
-		draw_line(player.position, t.position, _ca(col, 0.9), 4.0)
-		draw_line(player.position, t.position, Color(1, 1, 1, 1), 1.6)
-		draw_circle(t.position, 9.0 + sin(game.elapsed * 20.0) * 2.0, _ca(col, 0.5))
-		draw_circle(t.position, 3.5, Color(1, 1, 1, 0.95))
+		var freeze_beam: bool = w.evolved and bool(evo.get("freeze", false))
+		if freeze_beam:
+			# 絕對零度：加粗三層＋沿射線流動的能量球（輸送感，玩家回饋）
+			draw_line(player.position, t.position, _ca(col, 0.28), 15.0)
+			draw_line(player.position, t.position, _ca(col, 0.85), 7.5)
+			draw_line(player.position, t.position, Color(1, 1, 1, 0.95), 2.6)
+			var dirv := t.position - player.position
+			var beam_len := dirv.length()
+			if beam_len > 1.0:
+				var nv := dirv / beam_len
+				var spacing := 34.0
+				var d := fmod(game.elapsed * 300.0, spacing)
+				while d < beam_len:
+					var bp := player.position + nv * d
+					draw_circle(bp, 5.0, _ca(col, 0.5))
+					draw_circle(bp, 2.4, Color(1, 1, 1, 0.9))
+					d += spacing
+			draw_circle(t.position, 12.0 + sin(game.elapsed * 20.0) * 3.0, _ca(col, 0.5))
+			draw_circle(t.position, 4.5, Color(1, 1, 1, 0.95))
+		else:
+			# 三層光束：寬暈＋色體＋白芯（不用發光濾鏡，透明度分層）
+			draw_line(player.position, t.position, _ca(col, 0.3), 9.0)
+			draw_line(player.position, t.position, _ca(col, 0.9), 4.0)
+			draw_line(player.position, t.position, Color(1, 1, 1, 1), 1.6)
+			draw_circle(t.position, 9.0 + sin(game.elapsed * 20.0) * 2.0, _ca(col, 0.5))
+			draw_circle(t.position, 3.5, Color(1, 1, 1, 0.95))
 
 
 func _draw_orbits() -> void:

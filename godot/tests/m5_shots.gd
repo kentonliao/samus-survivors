@@ -62,11 +62,8 @@ func _process(delta: float) -> bool:
 			if t > 2.0:
 				step = 3
 				_shot("m5_cards.png")
-				if game.hud.cards_box != null:
-					for c in game.hud.cards_box.get_children():
-						if c is Button:
-							(c as Button).pressed.emit()
-							break
+				if game.hud.card_buttons.size() > 0:
+					game.hud.card_buttons[0].pressed.emit()
 		3:
 			if t > 2.5:
 				step = 4
@@ -92,9 +89,15 @@ func _process(delta: float) -> bool:
 		7:
 			if t > 4.6:
 				step = 8
-				game._trigger_victory()
+				game.hud.show_cutin(Color("#ff6a1a"), "VARIA SUIT 起動！")
 		8:
-			if t > 5.2:
+			if t > 5.1:
+				step = 9
+				_shot("m5_cutin.png")
+				game.hud.hide_cutin()
+				game._trigger_victory()
+		9:
+			if t > 5.7:
 				_shot("m5_victory.png")
 				print("[M5SHOT] done")
 				return true
