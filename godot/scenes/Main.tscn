@@ -7,11 +7,11 @@
 texture_filter = 1
 
 [node name="Background" type="Sprite2D" parent="."]
-position = Vector2(480, 300)
+position = Vector2(480, 270)
 texture = ExtResource("1_bg")
 
 [node name="Player" type="Node2D" parent="."]
-position = Vector2(480, 300)
+position = Vector2(480, 270)
 script = ExtResource("2_player")
 
 [node name="Anim" type="AnimatedSprite2D" parent="Player"]

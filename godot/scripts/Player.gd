@@ -5,7 +5,7 @@ extends Node2D
 
 const SPEED := 190.0
 const ARENA_MIN := Vector2(24, 24)
-const ARENA_MAX := Vector2(960 - 24, 600 - 24)
+const ARENA_MAX := Vector2(960 - 24, 540 - 24)
 
 var suit := "power"  # power / varia / gravity / hyper（之後由進化數驅動）
 var facing := 1
