@@ -1123,8 +1123,11 @@ func _draw_orbits() -> void:
 				draw_circle(bpos, 10.0 if w.evolved else 8.0, _ca(col, 0.65))
 				draw_circle(bpos, 4.0 if w.evolved else 3.0, Color(1, 1, 1, 0.9))
 			if w.evolved:
-				# 風暴旋轉電弧
+				# 風暴旋轉電弧：外圈＋內圈反向（HTML 2897-2900 同構）
 				draw_arc(player.position, radius, game.elapsed * 3.0, game.elapsed * 3.0 + PI * 1.15, 32, _ca(col, 0.35), 3.0)
+				draw_arc(player.position, radius * 0.72, -game.elapsed * 4.0, -game.elapsed * 4.0 + PI * 0.9, 24, _ca(col, 0.35), 3.0)
+			# 力場半透明底盤（HTML 2902-2903：讓力場有「範圍實體感」而非只有外框）
+			draw_circle(player.position, radius, _ca(col, 0.1))
 
 
 func _draw_lightning() -> void:
