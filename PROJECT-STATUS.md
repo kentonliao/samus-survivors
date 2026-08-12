@@ -391,8 +391,13 @@
   以取樣管線（腳本 scratchpad/icons16.py：格子內縮7.5%避開框線→遮蔽左上編號→
   亮部bbox補正方形→16x16分塊中位數取樣→8色量化）重繪全部20個圖示並替換 ICON_DEFS；
   iconURL 畫布改為依矩陣尺寸。教訓：**取樣格狀圖鑑時必須內縮避開格線，否則bbox會拾到外框**。
-  **其他待辦**：v2.0 圖示/進化特效的試玩驗收尚未回報；驗收後下一步=討論 Godot 移植計畫
-  （配樂/收集要素/存檔/Steam成就留待引擎內做）。
+  **🚀 Godot 移植已啟動（2026-08-12，HTML v2.1.1 功能凍結）**：
+  計畫見 GODOT-MIGRATION.md。玩家已裝 Godot 4.7.1。
+  M0+M1 完成：godot/ 專案骨架（960x600、Nearest過濾、GL Compatibility）＋
+  78個PNG資產（export_assets.py 從 index.html 矩陣解析匯出）＋
+  Player.gd（WASD移動/跑步10幀15fps/翻面/呼吸/邊界，手感參數照搬HTML版）。
+  **下一步 M2**：敵人與生成（7雜兵+精英+難度曲線+晶石+升級選單）。
+  HTML 版此後只修bug不加功能。開發循環：Claude寫檔→玩家Godot按F5→回報。
   **v1.9.2（第二十一輪）**：①絕對零度改為持續射線（evo加category:'beam_continuous'+range:300，
   weaponStats以damage×2.4換算dps，tickContinuousBeam持續凍結目標、巨型頭目走freezeCd防永凍；
   射線用進化冰藍色+白芯）；被凍結敵人蓋透明藍圓形標示（drawEnemies）
