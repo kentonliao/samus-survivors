@@ -8,15 +8,24 @@
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg-void:#05070c;
+    /* Super Metroid 裝備畫面配色（依 ref/68580f46...jpg）*/
+    --bg-void:#030106;
+    --sm-orange:#e8a020;      /* 面板橘 */
+    --sm-orange-hi:#f8d878;   /* 面板亮緣 */
+    --sm-orange-dk:#8a5a10;   /* 面板暗緣 */
+    --sm-pink:#f070a8;        /* 能量格粉紅 */
+    --sm-green:#58d854;       /* 線框綠 */
+    --sm-red:#e03028;         /* 紅點/警告 */
+    --sm-blue:#6888f8;        /* 數字藍 */
+    --grid-purple:rgba(90,45,130,0.35);
     --line-cyan:#4fd8ff;
     --line-cyan-dim:#1c5a6e;
-    --suit-orange:#ff7b3d;
-    --suit-orange-dim:#a34a1f;
+    --suit-orange:#e8a020;
+    --suit-orange-dim:#8a5a10;
     --hp-red:#ff3b3b;
     --gold:#ffd76a;
     --text-main:#dfe8f0;
-    --text-dim:#7d8ba0;
+    --text-dim:#9aa4b8;
   }
   *{box-sizing:border-box;}
   html,body{ margin:0;padding:0;height:100%; background:#000; font-family:'Share Tech Mono',monospace; color:var(--text-main); overflow:hidden; -webkit-user-select:none;user-select:none; }
@@ -25,23 +34,28 @@
   canvas{ position:absolute;top:0;left:0; width:100%;height:100%; image-rendering:pixelated; image-rendering:crisp-edges; display:block; background:#05070c; }
 
   #hud{ position:absolute;top:0;left:0;width:100%;height:100%; pointer-events:none; z-index:5; }
-  .hud-corner{ position:absolute; padding:10px 14px; background:linear-gradient(135deg, rgba(12,18,32,0.85), rgba(12,18,32,0.55)); border:1px solid var(--line-cyan-dim); clip-path:polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%); }
-  #hp-wrap{ top:14px; left:14px; width:230px; }
-  #hp-label{ font-family:'Press Start 2P'; font-size:10px; color:var(--line-cyan); letter-spacing:1px; margin-bottom:6px; display:flex; justify-content:space-between;}
-  #hp-bar-outer{ height:14px; background:#0a0e18; border:1px solid var(--line-cyan-dim); position:relative; overflow:hidden;}
-  #hp-bar-inner{ height:100%; width:100%; background:linear-gradient(90deg,#ff5b3d,#ffb03d); transition:width 0.15s linear; }
+  .hud-corner{ position:absolute; padding:9px 12px; background:rgba(3,1,6,0.88); border:2px solid #c8c8d8;
+    box-shadow:0 0 0 2px #000, 2px 2px 0 2px rgba(0,0,0,0.7); }
+  #hp-wrap{ top:14px; left:14px; width:236px; }
+  #hp-label{ font-family:'Press Start 2P'; font-size:10px; color:#fff; letter-spacing:1px; margin-bottom:6px; display:flex; justify-content:space-between;}
+  #hp-label span:last-child{ color:var(--sm-blue); }
+  #hp-bar-outer{ height:14px; background:#14060e; border:1px solid #000; position:relative; overflow:hidden;}
+  /* SM式能量格：粉紅方塊+黑縫 */
+  #hp-bar-inner{ height:100%; width:100%; transition:width 0.15s linear;
+    background:repeating-linear-gradient(90deg, var(--sm-pink) 0 9px, #a04070 9px 11px, transparent 11px 13px); }
 
-  #timer-wrap{ top:14px; right:14px; text-align:right; clip-path:polygon(10px 0,100% 0,100% 100%,0 100%,0 10px); }
-  #timer-txt{ font-family:'Press Start 2P'; font-size:19px; color:var(--gold); }
-  #depth-txt{ font-size:12px; color:var(--text-dim); margin-top:4px; }
+  #timer-wrap{ top:14px; right:14px; text-align:right; }
+  #timer-txt{ font-family:'Press Start 2P'; font-size:19px; color:var(--sm-orange); text-shadow:2px 2px 0 #000; }
+  #depth-txt{ font-family:'Press Start 2P'; font-size:8px; color:#c8c8d8; margin-top:5px; letter-spacing:1px; }
 
-  #xp-wrap{ bottom:14px; left:50%; transform:translateX(-50%); width:420px; text-align:center; clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 100%,0 100%);}
-  #xp-bar-outer{ height:8px; background:#0a0e18; border:1px solid var(--suit-orange-dim); margin-top:4px;}
-  #xp-bar-inner{ height:100%; width:0%; background:linear-gradient(90deg,#4fd8ff,#7effe0); transition:width 0.2s ease;}
-  #level-txt{ font-family:'Press Start 2P'; font-size:12px; color:var(--suit-orange); }
+  #xp-wrap{ bottom:14px; left:50%; transform:translateX(-50%); width:420px; text-align:center; }
+  #xp-bar-outer{ height:8px; background:#0a0612; border:1px solid #000; margin-top:4px;}
+  #xp-bar-inner{ height:100%; width:0%; transition:width 0.2s ease;
+    background:repeating-linear-gradient(90deg, var(--sm-green) 0 6px, #2a8830 6px 7px, transparent 7px 9px); }
+  #level-txt{ font-family:'Press Start 2P'; font-size:12px; color:var(--sm-orange); text-shadow:2px 2px 0 #000; }
 
   #suit-wrap{ bottom:14px; right:14px; text-align:right; }
-  #suit-name{ font-family:'Press Start 2P'; font-size:11px; color:var(--suit-orange); }
+  #suit-name{ font-family:'Press Start 2P'; font-size:11px; color:var(--sm-orange); text-shadow:2px 2px 0 #000; }
 
   #slotbar{ position:absolute; top:64px; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; gap:4px; z-index:5; align-items:center; }
   .slot-row{ display:flex; gap:4px; }
@@ -53,47 +67,75 @@
   #suit-banner{ position:absolute; top:100px; left:50%; transform:translate(-50%,10px); font-family:'Press Start 2P'; font-size:13px; color:#ffe066; text-shadow:0 0 16px rgba(255,224,102,0.7); opacity:0; pointer-events:none; z-index:22; transition:opacity 0.4s ease, transform 0.4s ease; white-space:nowrap; }
   #suit-banner.show{ opacity:1; transform:translate(-50%,0px); }
 
-  .overlay{ position:absolute;top:0;left:0;width:100%;height:100%; display:flex;flex-direction:column;align-items:center;justify-content:center; background:rgba(3,5,10,0.92); z-index:20; text-align:center; padding:20px; }
+  .overlay{ position:absolute;top:0;left:0;width:100%;height:100%; display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background-color:rgba(3,1,6,0.94); z-index:20; text-align:center; padding:20px;
+    background-image:linear-gradient(var(--grid-purple) 1px, transparent 1px), linear-gradient(90deg, var(--grid-purple) 1px, transparent 1px);
+    background-size:24px 24px; }
   .hidden{ display:none !important; }
-  .title-main{ font-family:'Press Start 2P'; font-size:38px; color:var(--suit-orange); text-shadow:0 0 18px rgba(255,123,61,0.6), 0 0 2px #fff; letter-spacing:2px; }
-  .title-sub{ font-family:'Press Start 2P'; font-size:13px; color:var(--line-cyan); margin-top:14px; letter-spacing:3px; }
+  .title-main{ font-family:'Press Start 2P'; font-size:38px; color:var(--sm-orange); text-shadow:3px 3px 0 #000, 0 0 18px rgba(232,160,32,0.5); letter-spacing:2px; }
+  .title-sub{ font-family:'Press Start 2P'; font-size:13px; color:#fff; margin-top:14px; letter-spacing:3px; text-shadow:2px 2px 0 #000; }
   .blink{ animation:blink 1.2s steps(2) infinite; }
   @keyframes blink{ 50%{opacity:0.15;} }
-  .flavor{ margin-top:26px; max-width:540px; font-size:14px; line-height:1.9; color:var(--text-dim); }
-  .flavor b{ color:var(--text-main); }
-  .start-btn{ margin-top:34px; pointer-events:all; cursor:pointer; font-family:'Press Start 2P'; font-size:13px; background:linear-gradient(180deg,#ff7b3d,#c24d1f); color:#1a0d05; padding:14px 30px; border:2px solid #ffd0a8; box-shadow:0 0 22px rgba(255,123,61,0.5); clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%); }
-  .start-btn:hover{ background:linear-gradient(180deg,#ff9a63,#d95f28); }
+  /* SM式橘色面板：黑字、亮緣+暗緣雙框、硬陰影 */
+  .sm-panel{ background:var(--sm-orange); color:#180c00; border:3px solid #000;
+    box-shadow:0 0 0 2px var(--sm-orange-hi) inset, 0 0 0 5px var(--sm-orange-dk) inset, 5px 5px 0 rgba(0,0,0,0.8); }
+  .flavor{ margin-top:26px; max-width:560px; font-size:14px; line-height:1.9; color:#241200;
+    background:var(--sm-orange); border:3px solid #000; box-shadow:0 0 0 2px var(--sm-orange-hi) inset, 5px 5px 0 rgba(0,0,0,0.8);
+    padding:16px 24px; text-align:left; }
+  .flavor b{ color:#7a0800; }
+  .start-btn{ margin-top:34px; pointer-events:all; cursor:pointer; font-family:'Press Start 2P'; font-size:13px;
+    background:var(--sm-orange); color:#180c00; padding:14px 30px; border:3px solid #000;
+    box-shadow:0 0 0 2px var(--sm-orange-hi) inset, 4px 4px 0 rgba(0,0,0,0.8); }
+  .start-btn:hover{ background:var(--sm-orange-hi); }
 
-  #gameover-title{ font-family:'Press Start 2P'; font-size:26px; color:var(--hp-red); text-shadow:0 0 16px rgba(255,59,59,0.6); }
-  .stat-row{ font-size:16px; margin:6px 0; color:var(--text-main); }
-  .stat-row span{ color:var(--gold); }
+  #gameover-title{ font-family:'Press Start 2P'; font-size:26px; color:#fff; letter-spacing:2px;
+    background:var(--sm-red); border:3px solid #000; box-shadow:0 0 0 2px #ff9088 inset, 5px 5px 0 rgba(0,0,0,0.8); padding:14px 28px; }
+  .stat-row{ font-family:'Press Start 2P'; font-size:11px; margin:10px 0; color:#fff; text-shadow:2px 2px 0 #000; }
+  .stat-row span{ color:var(--sm-orange); }
 
-  #victory-overlay{ background:radial-gradient(ellipse at center, rgba(20,10,5,0.95), rgba(3,2,1,0.98)); }
-  #victory-title{ font-family:'Press Start 2P'; font-size:28px; color:#ffd76a; text-shadow:0 0 22px rgba(255,215,106,0.7); letter-spacing:2px; }
-  #victory-sub{ font-family:'Press Start 2P'; font-size:12px; color:#e6201a; margin-top:12px; letter-spacing:2px; }
+  #victory-title{ font-family:'Press Start 2P'; font-size:26px; color:#180c00; letter-spacing:2px;
+    background:var(--gold); border:3px solid #000; box-shadow:0 0 0 2px #fff2c0 inset, 5px 5px 0 rgba(0,0,0,0.8); padding:14px 28px; }
+  #victory-sub{ font-family:'Press Start 2P'; font-size:11px; color:var(--sm-green); margin-top:14px; letter-spacing:2px; text-shadow:2px 2px 0 #000; }
 
-  #boss-announce{ position:absolute;inset:0; display:flex;flex-direction:column;align-items:center;justify-content:center; background:rgba(2,1,0,0.9); z-index:26; text-align:center; }
-  .boss-warn{ font-family:'Press Start 2P'; font-size:14px; color:#ff3b3b; letter-spacing:2px; text-shadow:0 0 14px rgba(255,59,59,0.8); }
-  .boss-title{ font-family:'Press Start 2P'; font-size:26px; color:#1e9628; margin-top:16px; text-shadow:0 0 20px rgba(30,150,40,0.7); }
-  .boss-flavor{ margin-top:16px; color:var(--text-dim); font-size:13px; max-width:480px; }
+  #boss-announce{ position:absolute;inset:0; display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background-color:rgba(6,0,0,0.93); z-index:26; text-align:center;
+    background-image:linear-gradient(rgba(140,30,30,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(140,30,30,0.25) 1px, transparent 1px);
+    background-size:24px 24px; }
+  .boss-warn{ font-family:'Press Start 2P'; font-size:15px; color:#fff; letter-spacing:2px; background:var(--sm-red);
+    border:3px solid #000; box-shadow:0 0 0 2px #ff9088 inset, 4px 4px 0 rgba(0,0,0,0.8); padding:10px 24px;
+    animation:blink 0.6s steps(2) infinite; }
+  .boss-title{ font-family:'Press Start 2P'; font-size:26px; color:var(--sm-green); margin-top:20px; text-shadow:3px 3px 0 #000, 0 0 20px rgba(88,216,84,0.5); }
+  .boss-flavor{ margin-top:18px; color:#241200; font-size:13px; max-width:480px; background:var(--sm-orange);
+    border:3px solid #000; box-shadow:0 0 0 2px var(--sm-orange-hi) inset, 4px 4px 0 rgba(0,0,0,0.8); padding:12px 20px; }
 
-  #levelup-overlay{ background:rgba(3,5,10,0.88); }
-  #levelup-title{ font-family:'Press Start 2P'; font-size:18px; color:var(--line-cyan); margin-bottom:26px; text-shadow:0 0 12px rgba(79,216,255,0.6);}
+  #levelup-title{ font-family:'Press Start 2P'; font-size:16px; color:#fff; margin-bottom:26px; text-shadow:2px 2px 0 #000;
+    background:#000; border:2px solid #fff; padding:10px 26px; letter-spacing:2px; }
   #cards{ display:flex; gap:18px; pointer-events:all; flex-wrap:wrap; justify-content:center; max-width:920px;}
-  .card{ width:224px; min-height:220px; background:linear-gradient(160deg, #16202f, #0a0f18); border:2px solid var(--line-cyan-dim); padding:16px 12px; cursor:pointer; display:flex; flex-direction:column; align-items:center; clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%); transition:transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease; }
-  .card:hover{ transform:translateY(-6px); border-color:var(--suit-orange); box-shadow:0 8px 26px rgba(255,123,61,0.25);}
-  .card-emoji{ font-size:34px; margin-bottom:10px; filter:drop-shadow(0 0 6px rgba(255,255,255,0.3)); }
-  .card-name{ font-family:'Press Start 2P'; font-size:13px; color:var(--suit-orange); text-align:center; line-height:1.6; margin-bottom:8px;}
-  .card-lv{ font-size:13px; color:var(--line-cyan); margin-bottom:8px;}
-  .card-desc{ font-size:13px; color:var(--text-dim); line-height:1.6; text-align:center;}
-  .card.newk .card-name{ color:var(--gold); }
-  .card.newk{ border-color:var(--gold); }
+  /* SM式橘色裝備面板卡片 */
+  .card{ width:224px; min-height:220px; background:var(--sm-orange); border:3px solid #000; padding:16px 12px; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center;
+    box-shadow:0 0 0 2px var(--sm-orange-hi) inset, 0 0 0 5px var(--sm-orange-dk) inset, 5px 5px 0 rgba(0,0,0,0.8);
+    transition:transform 0.1s ease; image-rendering:pixelated; }
+  .card:hover{ transform:translate(-2px,-4px); background:var(--sm-orange-hi);
+    box-shadow:0 0 0 2px #fff inset, 0 0 0 5px var(--sm-orange-dk) inset, 7px 9px 0 rgba(0,0,0,0.8); }
+  .card-emoji{ font-size:34px; margin-bottom:10px; filter:drop-shadow(2px 2px 0 rgba(0,0,0,0.4)); }
+  .card-name{ font-family:'Press Start 2P'; font-size:12px; color:#180c00; text-align:center; line-height:1.6; margin-bottom:8px; }
+  .card-name::before{ content:'● '; color:var(--sm-red); }
+  .card-lv{ font-family:'Press Start 2P'; font-size:9px; color:#7a0800; margin-bottom:8px; }
+  .card-desc{ font-size:13px; color:#402400; line-height:1.6; text-align:center; }
+  .card.newk{ background:#f8c040; }
+  .card.newk .card-name::before{ content:'★ '; color:#7a0800; }
 
-  #evo-overlay{ position:absolute;inset:0; display:flex;flex-direction:column;align-items:center;justify-content:center; background:rgba(5,3,0,0.88); z-index:25; text-align:center; }
-  .evo-title{ font-family:'Press Start 2P'; font-size:15px; color:#ff59e0; letter-spacing:2px; margin-bottom:16px; text-shadow:0 0 14px rgba(255,89,224,0.7);}
-  .evo-emoji{ font-size:56px; margin-bottom:14px; }
-  .evo-name{ font-family:'Press Start 2P'; font-size:24px; color:#ffe066; text-shadow:0 0 24px rgba(255,224,102,0.8); }
-  .evo-desc{ margin-top:16px; color:var(--text-dim); font-size:14px; max-width:480px; }
+  #evo-overlay{ position:absolute;inset:0; display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background-color:rgba(4,2,8,0.93); z-index:25; text-align:center;
+    background-image:linear-gradient(var(--grid-purple) 1px, transparent 1px), linear-gradient(90deg, var(--grid-purple) 1px, transparent 1px);
+    background-size:24px 24px; }
+  .evo-title{ font-family:'Press Start 2P'; font-size:14px; color:#fff; letter-spacing:2px; margin-bottom:18px;
+    background:var(--sm-pink); border:3px solid #000; box-shadow:0 0 0 2px #ffc0dc inset, 4px 4px 0 rgba(0,0,0,0.8); padding:9px 22px; }
+  .evo-emoji{ font-size:56px; margin-bottom:14px; filter:drop-shadow(3px 3px 0 rgba(0,0,0,0.6)); }
+  .evo-name{ font-family:'Press Start 2P'; font-size:24px; color:var(--gold); text-shadow:3px 3px 0 #000, 0 0 24px rgba(255,224,102,0.6); }
+  .evo-desc{ margin-top:18px; color:#241200; font-size:14px; max-width:480px; background:var(--sm-orange);
+    border:3px solid #000; box-shadow:0 0 0 2px var(--sm-orange-hi) inset, 4px 4px 0 rgba(0,0,0,0.8); padding:12px 20px; }
 
   #flash{ position:absolute;top:0;left:0;width:100%;height:100%; background:#fff; opacity:0; pointer-events:none; z-index:15; }
   #controls-hint{ position:absolute; bottom:8px; left:50%; transform:translateX(-50%); font-size:12px; color:var(--text-dim); z-index:5; pointer-events:none; letter-spacing:1px; }
@@ -128,7 +170,7 @@
       <div class="slot-row" id="passive-slots"></div>
     </div>
     <div id="suit-banner"></div>
-    <div id="controls-hint">WASD / 方向鍵 移動　．　自動開火</div>
+    <div id="controls-hint">WASD / 方向鍵 移動　．　自動開火　．　M 靜音</div>
 
     <div id="start-overlay" class="overlay">
       <div class="title-main">SAMUS<br>SURVIVORS</div>
@@ -188,11 +230,72 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = 'v1.8.2 · 2026-08-11 · 彈幕放大＋抓鉤閃電鋸齒化與連鎖範圍強化';
+const GAME_VERSION = 'v1.9 · 2026-08-12 · 8-bit音效系統＋UI像素風重製（Super Metroid配色）';
 const W = 960, H = 600;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
+
+/* =========================================================
+   8-bit 音效（Web Audio 振盪器程序化生成，無音檔）
+   每種音效有最小間隔(min, ms)防止洗版；M 鍵靜音
+========================================================= */
+const SFX = (function(){
+  let ac = null, master = null, muted = false;
+  const last = {};
+  function init(){
+    if(ac) return;
+    try{
+      ac = new (window.AudioContext||window.webkitAudioContext)();
+      master = ac.createGain(); master.gain.value = 0.22; master.connect(ac.destination);
+    }catch(e){ ac = null; }
+  }
+  function beep(type, f0, f1, dur, vol, delay){
+    const t = ac.currentTime + (delay||0);
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t);
+    if(f1 !== undefined) o.frequency.exponentialRampToValueAtTime(Math.max(1,f1), t+dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t+dur);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+0.02);
+  }
+  function noise(dur, vol, delay, freq){
+    const t = ac.currentTime + (delay||0);
+    const len = Math.floor(ac.sampleRate*dur);
+    const buf = ac.createBuffer(1, len, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i=0;i<len;i++){ d[i] = (Math.random()*2-1) * (1-i/len); }
+    const s = ac.createBufferSource(); s.buffer = buf;
+    const g = ac.createGain(); g.gain.value = vol;
+    const f = ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value = freq||1400;
+    s.connect(f); f.connect(g); g.connect(master); s.start(t);
+  }
+  const RECIPES = {
+    shoot:    {min:90,  fn:()=>beep('square', 880, 320, 0.07, 0.10)},
+    missile:  {min:150, fn:()=>{ beep('sawtooth', 200, 620, 0.18, 0.12); noise(0.12, 0.07, 0, 900); }},
+    hit:      {min:70,  fn:()=>noise(0.05, 0.09, 0, 2200)},
+    gem:      {min:60,  fn:()=>{ beep('square', 1250, undefined, 0.04, 0.08); beep('square', 1680, undefined, 0.05, 0.08, 0.045); }},
+    levelup:  {min:300, fn:()=>{ [523,659,784,1046].forEach((f,i)=>beep('square', f, undefined, 0.09, 0.14, i*0.07)); }},
+    select:   {min:100, fn:()=>beep('square', 700, 1000, 0.06, 0.12)},
+    evolve:   {min:300, fn:()=>{ [392,523,659,784,1046,1318].forEach((f,i)=>beep('square', f, undefined, 0.1, 0.13, i*0.08)); noise(0.5, 0.05, 0.4, 3000); }},
+    suit:     {min:300, fn:()=>{ [659,523,784,1046].forEach((f,i)=>beep('triangle', f, undefined, 0.14, 0.18, i*0.11)); }},
+    alert:    {min:400, fn:()=>{ for(let i=0;i<3;i++){ beep('square', 330, undefined, 0.14, 0.13, i*0.3); beep('square', 220, undefined, 0.14, 0.13, i*0.3+0.15); } }},
+    explosion:{min:120, fn:()=>{ noise(0.3, 0.15, 0, 700); beep('triangle', 130, 40, 0.3, 0.13); }},
+    hurt:     {min:200, fn:()=>beep('sawtooth', 220, 70, 0.16, 0.16)},
+    bosskill: {min:500, fn:()=>{ noise(0.7, 0.2, 0, 500); beep('triangle', 100, 30, 0.7, 0.17); [784,659,1046].forEach((f,i)=>beep('square', f, undefined, 0.12, 0.12, 0.5+i*0.1)); }},
+    victory:  {min:500, fn:()=>{ [523,659,784,1046,784,1318].forEach((f,i)=>beep('square', f, undefined, 0.16, 0.15, i*0.15)); }},
+    gameover: {min:500, fn:()=>{ [440,330,262,196].forEach((f,i)=>beep('triangle', f, undefined, 0.22, 0.16, i*0.2)); }},
+  };
+  function play(name){
+    if(!ac || muted) return;
+    const r = RECIPES[name]; if(!r) return;
+    const now = performance.now();
+    if(last[name] && now - last[name] < r.min) return;
+    last[name] = now;
+    try{ r.fn(); }catch(e){}
+  }
+  function toggleMute(){ muted = !muted; return muted; }
+  return { init, play, toggleMute };
+})();
 
 const $ = (id)=>document.getElementById(id);
 const hpNum = $('hp-num'), hpBar = $('hp-bar-inner');
@@ -1704,7 +1807,9 @@ const player = {
 };
 
 const keys = {};
-window.addEventListener('keydown', e=>{ keys[e.key.toLowerCase()]=true; });
+window.addEventListener('keydown', e=>{ keys[e.key.toLowerCase()]=true;
+  if(e.key.toLowerCase()==='m'){ const m = SFX.toggleMute(); suitBanner.textContent = m ? '♪ 靜音' : '♪ 音效開啟'; suitBanner.classList.add('show'); setTimeout(()=>suitBanner.classList.remove('show'), 1000); }
+});
 window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; });
 
 function currentPalette(){ return SUITS[player.suitTier]; }
@@ -1848,6 +1953,7 @@ function damageEnemy(en, dmg){
   if(en.dead) return;
   if(en.giant && (en.entering || en.dying)) return; // 巨型頭目進場中無敵；死亡演出中不再受擊
   en.hp -= dmg; en.hitFlash = 0.15;
+  SFX.play('hit');
   if(en.hp<=0){
     if(en.giant){ en.hp = 0; en.dying = 1.6; return; } // 巨型頭目進入死亡演出（連環爆炸後才移除）
     const idx = enemies.indexOf(en); if(idx>=0) killEnemy(idx);
@@ -1858,6 +1964,7 @@ function fireProjectileVolley(w, s){
   const def = WEAPON_DEFS[w.id];
   const target = nearestEnemy(player.x, player.y);
   if(!target) return;
+  SFX.play('shoot');
   const baseAng = Math.atan2(target.y-player.y, target.x-player.x);
   const count = Math.max(1, Math.round(s.count));
   const spread = def.spreadAngle!==undefined ? def.spreadAngle : 0.16;
@@ -1899,6 +2006,7 @@ function fireDirectionalWave(w, s){
 }
 
 function fireRadialBurst(w, s){
+  SFX.play('shoot');
   const def = WEAPON_DEFS[w.id];
   const count = w.evolved ? 18 : Math.max(1, Math.round(s.count)*3);
   for(let i=0;i<count;i++){
@@ -1941,6 +2049,7 @@ function tickOrbitAura(w, s, dt){
 function fireHoming(w, s){
   const def = WEAPON_DEFS[w.id];
   const count = Math.round(s.count);
+  SFX.play('missile');
   const targets = enemies.slice().sort((a,b)=>dist2(player.x,player.y,a.x,a.y)-dist2(player.x,player.y,b.x,b.y)).slice(0,count);
   for(let i=0;i<count;i++){
     const target = targets[i % Math.max(1,targets.length)];
@@ -1957,6 +2066,7 @@ function dropBomb(w, s){
   bombs.push({ x:player.x, y:player.y, fuse:s.fuseTime, blastRadius:s.blastRadius, dmg:s.damage, weaponId:w.id, evolved:w.evolved });
 }
 function explodeBomb(b){
+  SFX.play('explosion');
   const def = WEAPON_DEFS[b.weaponId];
   const color = b.evolved?def.evo.color:def.color;
   spawnBurst(b.x,b.y, color, b.evolved?26:14, b.evolved?200:120, 0.4);
@@ -2012,6 +2122,7 @@ function updateNovas(dt){
       const def = WEAPON_DEFS[n.weaponId];
       const color = n.evolved?def.evo.color:def.color;
       spawnBurst(n.x,n.y, color, n.evolved?40:22, n.evolved?260:160, 0.6);
+      SFX.play('explosion');
       addBlastRing(n.x,n.y,n.radius,color);
       addBlastRing(n.x,n.y,n.radius*0.6,'#ffffff');
       for(const en of enemies.slice()){ if(dist2(n.x,n.y,en.x,en.y) < n.radius*n.radius){ damageEnemy(en, n.dmg); } }
@@ -2802,6 +2913,7 @@ function updateEnemies(dt){
 }
 
 function applyDamageToPlayer(dmg){
+  SFX.play('hurt');
   player.hp -= dmg;
   if(player.hp<=0 && player.reserveCharges>0){
     player.reserveCharges -= 1;
@@ -2818,7 +2930,7 @@ function killEnemy(index){
   if(en.dead) return;
   en.dead = true;
   enemies.splice(index,1); // 必須先移除：自爆等死亡效果若再傷到彼此，會無限遞迴（相鄰自爆蟲互殺爆栈）
-  if(en === bossBattle){ bossBattle = null; enemyProjectiles.length = 0; } // 頭目戰結束：清彈幕、恢復生產
+  if(en === bossBattle){ bossBattle = null; enemyProjectiles.length = 0; SFX.play('bosskill'); } // 頭目戰結束：清彈幕、恢復生產
   spawnBurst(en.x,en.y, en.isBoss?'#ffe066':(en.flyer ? '#c58bff' : '#ffd76a'), en.isBoss?60:10, en.isBoss?260:140, en.isBoss?0.9:0.4);
   if(en.isFinalBoss){
     spawnBurst(en.x,en.y,'#1e9628',80,300,1.2);
@@ -2949,7 +3061,7 @@ function updateGems(dt){
       g.vx = Math.cos(ang)*420; g.vy = Math.sin(ang)*420;
     } else { g.vx*=0.9; g.vy*=0.9; }
     g.x += g.vx*dt; g.y += g.vy*dt;
-    if(d2 < (player.r+g.r+4)*(player.r+g.r+4)){ gainXp(g.value); gems.splice(i,1); }
+    if(d2 < (player.r+g.r+4)*(player.r+g.r+4)){ SFX.play('gem'); gainXp(g.value); gems.splice(i,1); }
   }
 }
 function drawGems(){
@@ -3034,6 +3146,7 @@ function checkSuitTier(){
     spawnBurst(player.x, player.y, currentPalette().highlight, 44, 230, 0.9);
     flashEl.style.transition='none'; flashEl.style.opacity='0.9';
     requestAnimationFrame(()=>{ flashEl.style.transition='opacity 0.6s ease'; flashEl.style.opacity='0'; });
+    SFX.play('suit');
     suitBanner.textContent = currentPalette().label + ' 起動！';
     suitBanner.classList.add('show');
     setTimeout(()=>{ suitBanner.classList.remove('show'); }, 1800);
@@ -3093,6 +3206,7 @@ function openLevelUp(){
     return;
   }
   state = 'levelup';
+  SFX.play('levelup');
   levelupOverlay.classList.remove('hidden');
   for(let i=pool.length-1;i>0;i--){ const j=randInt(0,i); [pool[i],pool[j]]=[pool[j],pool[i]]; }
   const picks = pool.slice(0,3);
@@ -3112,6 +3226,7 @@ function applyCard(card){
   else if(card.kind==='upgradeWeapon'){ const w=player.weapons.find(w=>w.id===card.id); w.level=Math.min(9,w.level+1); }
   else if(card.kind==='newPassive'){ const lvl=1; player.passives.push({id:card.id, level:lvl}); applyPassiveImmediate(card.id, lvl); }
   else if(card.kind==='upgradePassive'){ const p=player.passives.find(p=>p.id===card.id); p.level=Math.min(6,p.level+1); applyPassiveImmediate(card.id, p.level); }
+  SFX.play('select');
   checkEvolutions();
 }
 
@@ -3138,6 +3253,7 @@ function showFinalBossAnnouncement(){
   bossAnnounceEl.querySelector('.boss-title').textContent = 'QUEEN METROID';
   bossAnnounceEl.querySelector('.boss-flavor').innerHTML = '動力服已完全覺醒，星球深處的最終威脅甦醒了。<br>擊敗它，證明薩姆斯的極限。';
   bossAnnounceEl.classList.remove('hidden');
+  SFX.play('alert');
   const rid = gameRunId;
   setTimeout(()=>{
     if(rid!==gameRunId) return; // 玩家已重新開始新的一局，舊計時器作廢
@@ -3182,6 +3298,7 @@ function spawnFinalBoss(){
   bossBattle = boss; // 皇后也走頭目戰系統：頂部血條、彈幕、死亡演出、雜兵停產
 }
 function triggerVictory(){
+  SFX.play('victory');
   state = 'victory';
   const m = Math.floor(elapsed/60), s = Math.floor(elapsed%60);
   $('vic-time').textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
@@ -3197,6 +3314,7 @@ function showEvolutionAnnouncement(w){
   evoName.textContent = def.evo.name;
   evoDesc.textContent = def.evo.desc;
   evoOverlay.classList.remove('hidden');
+  SFX.play('evolve');
   spawnBurst(player.x,player.y, def.evo.color, 50, 240, 1.0);
   const rid = gameRunId;
   setTimeout(()=>{ if(rid!==gameRunId) return; evoOverlay.classList.add('hidden'); proceedAfterMenus(); }, 2200);
@@ -3242,12 +3360,14 @@ function resetGame(){
 }
 
 function startGame(){
+  SFX.init();
   resetGame(); state='playing';
   bossAnnounceEl.classList.add('hidden'); $('victory-overlay').classList.add('hidden');
   startOverlay.classList.add('hidden'); gameoverOverlay.classList.add('hidden');
   refreshSlotBar();
 }
 function endGame(){
+  SFX.play('gameover');
   state='gameover';
   const m = Math.floor(elapsed/60), s = Math.floor(elapsed%60);
   $('go-time').textContent = String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
@@ -3342,7 +3462,9 @@ function draw(){
 
   hpNum.textContent = Math.max(0,Math.ceil(player.hp))+'/'+player.maxHp;
   hpBar.style.width = clamp(player.hp/player.maxHp,0,1)*100+'%';
-  hpBar.style.background = (player.hp/player.maxHp<0.3) ? 'linear-gradient(90deg,#ff2020,#ff6a3d)' : 'linear-gradient(90deg,#ff5b3d,#ffb03d)';
+  hpBar.style.background = (player.hp/player.maxHp<0.3)
+    ? 'repeating-linear-gradient(90deg,#ff4040 0 9px,#a02020 9px 11px,transparent 11px 13px)'
+    : 'repeating-linear-gradient(90deg,#f070a8 0 9px,#a04070 9px 11px,transparent 11px 13px)'; // SM式能量格（低血量轉紅）
   levelTxt.textContent = 'LV. '+player.level;
   xpBar.style.width = clamp(player.xp/player.xpToNext,0,1)*100+'%';
   const m = Math.floor(elapsed/60), s = Math.floor(elapsed%60);
