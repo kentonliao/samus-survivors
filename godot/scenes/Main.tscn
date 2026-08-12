@@ -1,0 +1,17 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/background.png" id="1_bg"]
+[ext_resource type="Script" path="res://scripts/Player.gd" id="2_player"]
+
+[node name="Main" type="Node2D"]
+
+[node name="Background" type="Sprite2D" parent="."]
+position = Vector2(480, 300)
+texture = ExtResource("1_bg")
+
+[node name="Player" type="CharacterBody2D" parent="."]
+position = Vector2(480, 300)
+script = ExtResource("2_player")
+
+[node name="Anim" type="AnimatedSprite2D" parent="Player"]
+scale = Vector2(1.05, 1.05)

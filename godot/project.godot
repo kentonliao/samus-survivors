@@ -1,0 +1,23 @@
+; Engine configuration file.
+; Samus Survivors - Godot 版（自 HTML v2.1.1 移植）
+
+config_version=5
+
+[application]
+
+config/name="Samus Survivors"
+run/main_scene="res://scenes/Main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[display]
+
+window/size/viewport_width=960
+window/size/viewport_height=600
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
