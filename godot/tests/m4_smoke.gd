@@ -42,9 +42,9 @@ func _process(delta: float) -> bool:
 		game.announce_time = 0.15
 	# 防死亡
 	game.player.hp = game.player.max_hp
-	# 自動選卡
-	if game.menu_open and game.menu_box != null:
-		for c in game.menu_box.get_children():
+	# 自動選卡（M5起卡片在 Hud.cards_box）
+	if game.menu_open and game.hud.cards_box != null:
+		for c in game.hud.cards_box.get_children():
 			if c is Button:
 				(c as Button).pressed.emit()
 				break

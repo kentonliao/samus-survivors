@@ -19,11 +19,14 @@ var last_move_angle := 0.0   # 波動光束發射方向（跟隨最後移動方�
 var dmg_reduction := 0.0     # 動力服減傷（每幀由 Game 依 mods 同步）
 var reserve_charges := 0     # 備用能量槽次數
 var reserve_heal_pct := 0.3
+var sfx: Sfx = null          # 受傷音效（Game 於 _ready 注入）
 
 
 func hurt(dmg: float) -> void:
 	if invul > 0.0:
 		return
+	if sfx != null:
+		sfx.play("hurt")
 	hp -= dmg * (1.0 - dmg_reduction)
 	invul = 0.6
 	if hp <= 0.0 and reserve_charges > 0:

@@ -31,9 +31,9 @@ func _process(delta: float) -> bool:
 	# 防死亡（接觸傷害會累積）
 	if game.player.hp < 40.0:
 		game.player.hp = game.player.max_hp
-	# 模擬點擊升級卡
-	if game.menu_open and game.menu_box != null:
-		for c in game.menu_box.get_children():
+	# 模擬點擊升級卡（M5起卡片在 Hud.cards_box）
+	if game.menu_open and game.hud.cards_box != null:
+		for c in game.hud.cards_box.get_children():
 			if c is Button:
 				cards_picked += 1
 				(c as Button).pressed.emit()

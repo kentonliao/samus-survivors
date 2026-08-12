@@ -234,6 +234,8 @@ func _update_boss(dt: float) -> void:
 			var bp := b.position + Vector2(rng.randf_range(-b.wpx * 0.3, b.wpx * 0.3), rng.randf_range(-b.hpx * 0.35, b.hpx * 0.35))
 			fx.spawn_burst(bp, Color("#ffe066"), 14, 190.0, 0.5)
 			fx.add_ring(b.position + Vector2(rng.randf_range(-b.wpx * 0.25, b.wpx * 0.25), rng.randf_range(-b.hpx * 0.3, b.hpx * 0.3)), rng.randf_range(35.0, 75.0), Color("#ffbf50"))
+			game.sfx.play("explosion")
+			game.add_shake(2.5)
 		b.alpha = clampf(b.dying / 1.0, 0.0, 1.0)
 		b.shake_x = rng.randf_range(-4.0, 4.0)
 		b.shake_y = rng.randf_range(-3.0, 3.0)
@@ -241,6 +243,7 @@ func _update_boss(dt: float) -> void:
 		if b.dying <= 0.0:
 			fx.spawn_burst(b.position, Color.WHITE, 60, 320.0, 0.9)
 			fx.add_ring(b.position, maxf(b.wpx, b.hpx) * 0.7, Color.WHITE)
+			game.add_shake(8.0)
 			var idx := game.enemies.find(b)
 			if idx >= 0:
 				game.kill_enemy(idx)

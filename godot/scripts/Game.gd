@@ -1,7 +1,7 @@
 class_name Game
 extends Node2D
-## M3 主控制器：時間/難度曲線/敵人生成/經驗/HUD ＋ 完整武器系統整合
-## （升級抽卡6+6欄位、12進化、進化公告、動力服自動變色）
+## M5 主控制器：時間/難度曲線/敵人生成/經驗/武器系統/頭目戰
+## ＋ SM風格HUD（Hud.gd）＋ 8-bit音效（Sfx.gd）＋ 畫面震動
 ## 中央迴圈驅動所有實體陣列（HTML版同構移植）
 
 const W := 960.0
@@ -43,12 +43,12 @@ var magnet_radius := 90.0
 var announce_time := 0.0          # 公告倒數（>0 時遊戲暫停）
 var announce_action := ""         # 公告結束時的動作："" / midboss / queen
 var announce_entry := {}          # midboss 公告攜帶的 BOSS_TABLE 條目
-var banner_time := 0.0            # 動力服橫幅倒數
-var flash_time := 0.0             # 變身白閃倒數（刻意保留的慶祝特效）
 var evolution_queue: Array = []   # 待公告的 WeaponSystem.WeaponInst
 var final_boss_pending := false   # QUEEN 待觸發（6把全進化或25分保底）
 var final_boss_triggered := false # 只觸發一次
 var victorious := false
+var shake_amt := 0.0              # 畫面震動強度（爆炸/頭目死亡/變身）
+var m_prev := false               # M鍵靜音去彈跳
 
 var rng := RandomNumberGenerator.new()
 
@@ -56,28 +56,8 @@ var rng := RandomNumberGenerator.new()
 var weapon_sys: WeaponSystem
 var boss_sys: BossSystem
 var fx: FxLayer
-var hud: CanvasLayer
-var hp_bar: ColorRect
-var hp_label: Label
-var timer_label: Label
-var lv_label: Label
-var xp_bar: ColorRect
-var weapon_slots_label: Label
-var passive_slots_label: Label
-var banner_label: Label
-var menu_layer: CanvasLayer
-var menu_box: VBoxContainer
-var announce_layer: CanvasLayer
-var announce_warn: Label
-var announce_name: Label
-var announce_desc: Label
-var flash_layer: CanvasLayer
-var flash_rect: ColorRect
-var dead_label: Label
-var boss_bar_name: Label
-var boss_bar_bg: ColorRect
-var boss_bar_fill: ColorRect
-var victory_label: Label
+var hud: GameHud
+var sfx: Sfx
 
 
 func _ready() -> void:
@@ -98,21 +78,25 @@ func _ready() -> void:
 	boss_sys.fx = fx
 	boss_sys.z_index = 3     # 敵方彈幕：敵人之上、玩家之下
 	add_child(boss_sys)
+	sfx = Sfx.new()
+	add_child(sfx)
+	hud = GameHud.new()
+	hud.card_picked.connect(_on_card_picked)
+	add_child(hud)
+	weapon_sys.sfx = sfx
+	player.sfx = sfx
 	weapon_sys.add_weapon("powerBeam")   # 初始武器
 	player.reserve_triggered.connect(_on_reserve_triggered)
-	_build_hud()
-	_refresh_slots()
+	hud.refresh_slots(weapon_sys)
 
 
 func _process(delta: float) -> void:
-	if flash_time > 0.0:
-		flash_time -= delta
-		flash_rect.modulate.a = clampf(flash_time / 0.6, 0.0, 1.0) * 0.9
-		flash_rect.visible = flash_time > 0.0
-	if banner_time > 0.0:
-		banner_time -= delta
-		if banner_time <= 0.0:
-			banner_label.visible = false
+	# M鍵靜音（隨時可按）
+	var m_now := Input.is_physical_key_pressed(KEY_M)
+	if m_now and not m_prev:
+		var mm := sfx.toggle_mute()
+		hud.show_banner("♪ 靜音" if mm else "♪ 音效開啟")
+	m_prev = m_now
 	if dead or victorious:
 		if Input.is_physical_key_pressed(KEY_R):
 			get_tree().reload_current_scene()
@@ -121,7 +105,7 @@ func _process(delta: float) -> void:
 		# 公告期間全場暫停（進化/頭目警告共用）
 		announce_time -= delta
 		if announce_time <= 0.0:
-			announce_layer.visible = false
+			hud.hide_announce()
 			var action := announce_action
 			announce_action = ""
 			match action:
@@ -135,6 +119,13 @@ func _process(delta: float) -> void:
 	if menu_open:
 		return
 	elapsed += delta
+	# 畫面震動（爆炸/頭目死亡/變身時累加，指數衰減）
+	if shake_amt > 0.001:
+		position = Vector2(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0)) * shake_amt
+		shake_amt *= exp(-6.0 * delta)
+		if shake_amt < 0.05:
+			shake_amt = 0.0
+			position = Vector2.ZERO
 	weapon_sys.refresh_mods()
 	player.speed = 190.0 * weapon_sys.mods.speed_mult
 	player.dmg_reduction = weapon_sys.mods.suit_dmg_reduction
@@ -145,7 +136,7 @@ func _process(delta: float) -> void:
 	boss_sys.tick(delta)
 	_update_gems(delta)
 	fx.tick(delta)
-	_update_hud()
+	hud.update_status(player.hp, player.max_hp, elapsed, level, xp / xp_next, String(SUIT_LABELS[player.suit]), boss_sys.boss_battle)
 	if player.hp <= 0.0:
 		_game_over()
 		return
@@ -171,6 +162,10 @@ func _process(delta: float) -> void:
 		return
 	if levelups_queued > 0:
 		_open_levelup()
+
+
+func add_shake(a: float) -> void:
+	shake_amt = minf(10.0, shake_amt + a)
 
 
 # ---------- 難度 ----------
@@ -309,6 +304,7 @@ func damage_enemy(e: EnemyUnit, dmg: float) -> void:
 		return   # 巨型頭目進場中無敵；死亡演出中不再受擊
 	e.hp -= dmg
 	e.hit_flash = 0.15
+	sfx.play("hit")
 	if e.hp <= 0.0:
 		if e.giant:
 			e.hp = 0.0
@@ -329,6 +325,7 @@ func kill_enemy(idx: int) -> void:
 		# 頭目戰結束：清空敵方彈幕、恢復雜兵生產
 		boss_sys.boss_battle = null
 		boss_sys.enemy_projectiles.clear()
+		sfx.play("bosskill")
 	fx.spawn_burst(e.position, Color("#ffe066") if e.is_boss else (Color("#c58bff") if e.flyer else Color("#ffd76a")), 60 if e.is_boss else 10, 260.0 if e.is_boss else 140.0, 0.9 if e.is_boss else 0.4)
 	if e.is_final_boss:
 		fx.spawn_burst(e.position, Color("#1e9628"), 80, 300.0, 1.2)
@@ -397,6 +394,7 @@ func _update_gems(delta: float) -> void:
 		g.position += Vector2(g.vx, g.vy) * delta
 		if d < 8.0 + g.radius + 4.0:
 			_gain_xp(g.value)
+			sfx.play("gem")
 			gems.remove_at(i)
 			g.queue_free()
 
@@ -424,33 +422,25 @@ func _open_levelup() -> void:
 	levelups_queued -= 1
 	menu_open = true
 	player.set_process(false)
+	sfx.play("levelup")
 	pool.shuffle()
-	for c in menu_box.get_children():
-		c.queue_free()
-	var title := Label.new()
-	title.text = "── 能量吸收：選擇強化 ──"
-	title.add_theme_font_size_override("font_size", 22)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	menu_box.add_child(title)
+	var picks: Array = []
 	for i in range(mini(3, pool.size())):
 		var card: Dictionary = pool[i]
 		var info := weapon_sys.card_label(card)
-		var btn := Button.new()
-		btn.text = "%s\n%s" % [String(info["title"]), String(info["desc"])]
-		btn.custom_minimum_size = Vector2(600, 64)
-		btn.add_theme_font_size_override("font_size", 15)
-		btn.pressed.connect(_on_card_pressed.bind(card))
-		menu_box.add_child(btn)
-	menu_layer.visible = true
+		info["card"] = card
+		picks.append(info)
+	hud.open_levelup(picks)
 
 
-func _on_card_pressed(card: Dictionary) -> void:
+func _on_card_picked(card: Dictionary) -> void:
+	sfx.play("select")
 	weapon_sys.apply_card(card)
 	for w in weapon_sys.check_evolutions():
 		evolution_queue.append(w)
 	_check_suit_tier()
-	_refresh_slots()
-	menu_layer.visible = false
+	hud.refresh_slots(weapon_sys)
+	hud.close_levelup()
 	menu_open = false
 	player.set_process(true)
 	_proceed_after_menus()
@@ -470,14 +460,12 @@ func _proceed_after_menus() -> void:
 func _show_evolution(w: WeaponSystem.WeaponInst) -> void:
 	var def: Dictionary = WeaponData.WEAPONS[w.id]
 	var evo: Dictionary = def["evo"]
-	announce_warn.text = "◆ 武器進化 ◆"
-	announce_name.text = String(evo["name"])
-	announce_desc.text = String(evo["desc"])
-	announce_layer.visible = true
+	hud.show_evolution(w.id, String(evo["name"]), String(evo["desc"]))
 	announce_time = 2.2
 	player.set_process(false)
+	sfx.play("evolve")
 	fx.spawn_burst(player.position, Color(String(evo["color"])), 50, 240.0, 1.0)
-	_refresh_slots()
+	hud.refresh_slots(weapon_sys)
 
 
 func _check_suit_tier() -> void:
@@ -492,227 +480,37 @@ func _check_suit_tier() -> void:
 	if tier != player.suit:
 		player.set_suit(tier)
 		fx.spawn_burst(player.position, Color(String(SUIT_HIGHLIGHT[tier])), 44, 230.0, 0.9)
-		flash_time = 0.6   # 變身白閃：刻意保留的稀有慶祝特效（設計決策）
-		flash_rect.visible = true
-		_show_banner(String(SUIT_LABELS[tier]) + " 起動！")
+		hud.flash_white()   # 變身白閃：刻意保留的稀有慶祝特效（設計決策）
+		hud.show_banner(String(SUIT_LABELS[tier]) + " 起動！")
+		sfx.play("suit")
+		add_shake(4.0)
 	if cnt >= 6 and not final_boss_triggered:
 		final_boss_triggered = true
 		final_boss_pending = true   # QUEEN METROID（含頭目連戰）由 _process 消化
 
 
-func _show_banner(text: String) -> void:
-	banner_label.text = text
-	banner_label.visible = true
-	banner_time = 1.8
-
-
 func _show_boss_announce(title: String, flavor: String, duration: float, action: String, entry: Dictionary) -> void:
-	announce_warn.text = "★ 威脅偵測 ★"
-	announce_warn.add_theme_color_override("font_color", Color("#ff4040"))
-	announce_name.text = title
-	announce_desc.text = flavor
-	announce_layer.visible = true
+	hud.show_boss_announce(title, flavor)
 	announce_time = duration
 	announce_action = action
 	announce_entry = entry
 	player.set_process(false)
+	sfx.play("alert")
 
 
 func _trigger_victory() -> void:
 	victorious = true
+	sfx.play("victory")
 	var m := int(elapsed) / 60
 	var s := int(elapsed) % 60
-	victory_label.text = "MISSION COMPLETE\n\n存活 %02d:%02d｜LV %d｜%s\n\n按 R 再次挑戰" % [m, s, level, String(SUIT_LABELS[player.suit])]
-	victory_label.visible = true
+	hud.show_victory("存活 %02d:%02d｜LV %d｜%s" % [m, s, level, String(SUIT_LABELS[player.suit])])
 	player.set_process(false)
-
-
-# ---------- HUD ----------
-func _build_hud() -> void:
-	hud = CanvasLayer.new()
-	add_child(hud)
-	hp_label = Label.new()
-	hp_label.position = Vector2(14, 10)
-	hud.add_child(hp_label)
-	var hp_bg := ColorRect.new()
-	hp_bg.position = Vector2(14, 34)
-	hp_bg.size = Vector2(204, 14)
-	hp_bg.color = Color(0.08, 0.02, 0.05)
-	hud.add_child(hp_bg)
-	hp_bar = ColorRect.new()
-	hp_bar.position = Vector2(16, 36)
-	hp_bar.size = Vector2(200, 10)
-	hp_bar.color = Color("#f070a8")
-	hud.add_child(hp_bar)
-	weapon_slots_label = Label.new()
-	weapon_slots_label.position = Vector2(14, 52)
-	weapon_slots_label.add_theme_font_size_override("font_size", 13)
-	hud.add_child(weapon_slots_label)
-	passive_slots_label = Label.new()
-	passive_slots_label.position = Vector2(14, 70)
-	passive_slots_label.add_theme_font_size_override("font_size", 13)
-	hud.add_child(passive_slots_label)
-	timer_label = Label.new()
-	timer_label.position = Vector2(W - 100, 10)
-	timer_label.add_theme_font_size_override("font_size", 22)
-	hud.add_child(timer_label)
-	# 巨型頭目：畫面頂部大血條＋名稱
-	boss_bar_name = Label.new()
-	boss_bar_name.position = Vector2(0, 2)
-	boss_bar_name.size = Vector2(W, 20)
-	boss_bar_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	boss_bar_name.add_theme_font_size_override("font_size", 15)
-	boss_bar_name.add_theme_color_override("font_color", Color("#ffe066"))
-	boss_bar_name.visible = false
-	hud.add_child(boss_bar_name)
-	boss_bar_bg = ColorRect.new()
-	boss_bar_bg.position = Vector2(W / 2 - 192, 24)
-	boss_bar_bg.size = Vector2(384, 14)
-	boss_bar_bg.color = Color(0, 0, 0, 0.65)
-	boss_bar_bg.visible = false
-	hud.add_child(boss_bar_bg)
-	boss_bar_fill = ColorRect.new()
-	boss_bar_fill.position = Vector2(W / 2 - 190, 26)
-	boss_bar_fill.size = Vector2(380, 10)
-	boss_bar_fill.color = Color("#ffe066")
-	boss_bar_fill.visible = false
-	hud.add_child(boss_bar_fill)
-	lv_label = Label.new()
-	lv_label.position = Vector2(W / 2 - 30, H - 50)
-	hud.add_child(lv_label)
-	var xp_bg := ColorRect.new()
-	xp_bg.position = Vector2(W / 2 - 210, H - 24)
-	xp_bg.size = Vector2(424, 10)
-	xp_bg.color = Color(0.04, 0.02, 0.07)
-	hud.add_child(xp_bg)
-	xp_bar = ColorRect.new()
-	xp_bar.position = Vector2(W / 2 - 208, H - 22)
-	xp_bar.size = Vector2(0, 6)
-	xp_bar.color = Color("#58d854")
-	hud.add_child(xp_bar)
-	# 動力服橫幅
-	banner_label = Label.new()
-	banner_label.position = Vector2(0, 64)
-	banner_label.size = Vector2(W, 34)
-	banner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	banner_label.add_theme_font_size_override("font_size", 26)
-	banner_label.add_theme_color_override("font_color", Color("#ffe27a"))
-	banner_label.visible = false
-	hud.add_child(banner_label)
-	# 升級選單
-	menu_layer = CanvasLayer.new()
-	menu_layer.layer = 10
-	menu_layer.visible = false
-	add_child(menu_layer)
-	var dim := ColorRect.new()
-	dim.color = Color(0.01, 0.0, 0.03, 0.85)
-	dim.size = Vector2(W, H)
-	menu_layer.add_child(dim)
-	var center := CenterContainer.new()
-	center.size = Vector2(W, H)
-	menu_layer.add_child(center)
-	menu_box = VBoxContainer.new()
-	menu_box.add_theme_constant_override("separation", 14)
-	center.add_child(menu_box)
-	# 進化公告
-	announce_layer = CanvasLayer.new()
-	announce_layer.layer = 15
-	announce_layer.visible = false
-	add_child(announce_layer)
-	var adim := ColorRect.new()
-	adim.color = Color(0.02, 0.0, 0.05, 0.88)
-	adim.size = Vector2(W, H)
-	announce_layer.add_child(adim)
-	var acenter := CenterContainer.new()
-	acenter.size = Vector2(W, H)
-	announce_layer.add_child(acenter)
-	var abox := VBoxContainer.new()
-	abox.add_theme_constant_override("separation", 12)
-	acenter.add_child(abox)
-	announce_warn = Label.new()
-	announce_warn.add_theme_font_size_override("font_size", 20)
-	announce_warn.add_theme_color_override("font_color", Color("#ff7ae0"))
-	announce_warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	abox.add_child(announce_warn)
-	announce_name = Label.new()
-	announce_name.add_theme_font_size_override("font_size", 34)
-	announce_name.add_theme_color_override("font_color", Color("#ffe27a"))
-	announce_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	abox.add_child(announce_name)
-	announce_desc = Label.new()
-	announce_desc.add_theme_font_size_override("font_size", 17)
-	announce_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	abox.add_child(announce_desc)
-	# 變身白閃（最上層）
-	flash_layer = CanvasLayer.new()
-	flash_layer.layer = 30
-	add_child(flash_layer)
-	flash_rect = ColorRect.new()
-	flash_rect.color = Color.WHITE
-	flash_rect.size = Vector2(W, H)
-	flash_rect.visible = false
-	flash_layer.add_child(flash_rect)
-	# 死亡畫面
-	dead_label = Label.new()
-	dead_label.add_theme_font_size_override("font_size", 30)
-	dead_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	dead_label.position = Vector2(W / 2 - 220, H / 2 - 70)
-	dead_label.visible = false
-	hud.add_child(dead_label)
-	# 勝利畫面
-	victory_label = Label.new()
-	victory_label.add_theme_font_size_override("font_size", 30)
-	victory_label.add_theme_color_override("font_color", Color("#ffe066"))
-	victory_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	victory_label.position = Vector2(W / 2 - 260, H / 2 - 80)
-	victory_label.visible = false
-	hud.add_child(victory_label)
-
-
-func _refresh_slots() -> void:
-	var wparts := PackedStringArray()
-	for w in weapon_sys.weapons:
-		var def: Dictionary = WeaponData.WEAPONS[w.id]
-		wparts.append("%s %s" % [String(def["name"]), "MAX★" if w.evolved else str(w.level)])
-	if wparts.size() > 0:
-		weapon_slots_label.text = "武器：" + "｜".join(wparts)
-	else:
-		weapon_slots_label.text = "武器：—"
-	var pparts := PackedStringArray()
-	for p in weapon_sys.passives:
-		var pdef: Dictionary = WeaponData.PASSIVES[p.id]
-		pparts.append("%s %d" % [String(pdef["name"]), p.level])
-	if pparts.size() > 0:
-		passive_slots_label.text = "被動：" + "｜".join(pparts)
-	else:
-		passive_slots_label.text = "被動：—"
-
-
-func _update_hud() -> void:
-	hp_label.text = "ENERGY  %d / %d" % [ceili(maxf(0, player.hp)), int(player.max_hp)]
-	hp_bar.size.x = 200.0 * clampf(player.hp / player.max_hp, 0.0, 1.0)
-	hp_bar.color = Color("#ff4040") if player.hp / player.max_hp < 0.3 else Color("#f070a8")
-	var m := int(elapsed) / 60
-	var s := int(elapsed) % 60
-	timer_label.text = "%02d:%02d" % [m, s]
-	lv_label.text = "LV. %d" % level
-	xp_bar.size.x = 420.0 * clampf(xp / xp_next, 0.0, 1.0)
-	# 頂部頭目血條
-	var b := boss_sys.boss_battle
-	var show_bar := b != null and is_instance_valid(b) and not b.dead
-	boss_bar_name.visible = show_bar
-	boss_bar_bg.visible = show_bar
-	boss_bar_fill.visible = show_bar
-	if show_bar:
-		boss_bar_name.text = b.boss_name
-		boss_bar_fill.size.x = 380.0 * clampf(b.hp / b.max_hp, 0.0, 1.0)
-		boss_bar_fill.color = Color("#1e9628") if b.is_final_boss else Color("#ffe066")
 
 
 func _game_over() -> void:
 	dead = true
+	sfx.play("gameover")
 	var m := int(elapsed) / 60
 	var s := int(elapsed) % 60
-	dead_label.text = "ENERGY DEPLETED\n\n存活 %02d:%02d｜LV %d｜進化 %d 把\n\n按 R 重新挑戰" % [m, s, level, weapon_sys.evolved_count()]
-	dead_label.visible = true
+	hud.show_dead("存活 %02d:%02d｜LV %d｜進化 %d 把" % [m, s, level, weapon_sys.evolved_count()])
 	player.set_process(false)

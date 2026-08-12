@@ -140,6 +140,7 @@ class GroundLayer:
 var game: Game
 var player: PlayerUnit
 var fx: FxLayer
+var sfx: Sfx
 var rng := RandomNumberGenerator.new()
 
 var weapons: Array[WeaponInst] = []
@@ -288,6 +289,7 @@ func check_evolutions() -> Array[WeaponInst]:
 
 
 func card_label(card: Dictionary) -> Dictionary:
+	# 回傳卡片顯示資訊：icon/name/lv_line/desc/is_new（Hud 裝備框卡片用）
 	var kind: String = card["kind"]
 	var id: String = card["id"]
 	if kind == "newWeapon" or kind == "upgradeWeapon":
@@ -297,22 +299,14 @@ func card_label(card: Dictionary) -> Dictionary:
 		var pdef: Dictionary = WeaponData.PASSIVES[partner_id]
 		var owned := get_weapon(id)
 		var lvl := 0 if owned == null else owned.level
-		var title: String
-		if kind == "newWeapon":
-			title = "【新武器】%s" % String(def["name"])
-		else:
-			title = "%s  Lv.%d → %d / 9" % [String(def["name"]), lvl, lvl + 1]
-		var desc := "進化搭檔：%s(%d/6) → %s" % [String(pdef["name"]), passive_level(partner_id), String(evo["name"])]
-		return {"title": title, "desc": desc}
+		var lv_line := "【首次獲得】" if kind == "newWeapon" else "Lv.%d → %d / 9" % [lvl, lvl + 1]
+		var desc := "進化搭檔：%s(%d/6)\n→ %s" % [String(pdef["name"]), passive_level(partner_id), String(evo["name"])]
+		return {"icon": id, "name": String(def["name"]), "lv_line": lv_line, "desc": desc, "is_new": kind == "newWeapon"}
 	else:
 		var pdef: Dictionary = WeaponData.PASSIVES[id]
 		var owned := get_passive(id)
 		var lvl := 0 if owned == null else owned.level
-		var title: String
-		if kind == "newPassive":
-			title = "【新被動】%s" % String(pdef["name"])
-		else:
-			title = "%s  Lv.%d → %d / 6" % [String(pdef["name"]), lvl, lvl + 1]
+		var lv_line := "【首次獲得】" if kind == "newPassive" else "Lv.%d → %d / 6" % [lvl, lvl + 1]
 		var wnames := PackedStringArray()
 		for wid in WeaponData.WEAPON_ORDER:
 			var wdef: Dictionary = WeaponData.WEAPONS[wid]
@@ -320,8 +314,8 @@ func card_label(card: Dictionary) -> Dictionary:
 				wnames.append(String(wdef["name"]))
 		var desc: String = String(pdef["desc"])
 		if wnames.size() > 0:
-			desc += "｜可進化：" + "、".join(wnames)
-		return {"title": title, "desc": desc}
+			desc += "\n可進化：" + "、".join(wnames)
+		return {"icon": id, "name": String(pdef["name"]), "lv_line": lv_line, "desc": desc, "is_new": kind == "newPassive"}
 
 
 # ---------- 數值計算（HTML weaponStats 同構）----------
@@ -521,6 +515,7 @@ func _fire_projectile_volley(w: WeaponInst, s: Stats) -> void:
 	var target := _nearest_enemy(player.position)
 	if target == null:
 		return
+	sfx.play("shoot")
 	var base_ang := (target.position - player.position).angle()
 	var count := maxi(1, roundi(s.count))
 	var spread := WeaponData.num(def, "spreadAngle", 0.16)
@@ -574,6 +569,7 @@ func _fire_directional_wave(w: WeaponInst, s: Stats) -> void:
 
 
 func _fire_radial_burst(w: WeaponInst, s: Stats) -> void:
+	sfx.play("shoot")
 	var def: Dictionary = WeaponData.WEAPONS[w.id]
 	var evo: Dictionary = def["evo"]
 	var count := 18 if w.evolved else maxi(1, roundi(s.count) * 3)
@@ -662,6 +658,7 @@ func _fire_homing(w: WeaponInst, s: Stats) -> void:
 	var def: Dictionary = WeaponData.WEAPONS[w.id]
 	var evo: Dictionary = def["evo"]
 	var count := roundi(s.count)
+	sfx.play("missile")
 	_sort_from = player.position
 	var sorted := game.enemies.duplicate()
 	sorted.sort_custom(_cmp_dist)
@@ -700,6 +697,8 @@ func _drop_bomb(w: WeaponInst, s: Stats) -> void:
 
 
 func _explode_bomb(b: Bomb) -> void:
+	sfx.play("explosion")
+	game.add_shake(2.0)
 	var def: Dictionary = WeaponData.WEAPONS[b.weapon_id]
 	var evo: Dictionary = def["evo"]
 	var color := Color(String(evo["color"])) if b.evolved else Color(String(def["color"]))
@@ -754,6 +753,8 @@ func _update_novas(dt: float) -> void:
 		if n.delay > 0.0:
 			continue
 		novas.remove_at(i)
+		sfx.play("explosion")
+		game.add_shake(4.0)
 		var def: Dictionary = WeaponData.WEAPONS[n.weapon_id]
 		var evo: Dictionary = def["evo"]
 		var color := Color(String(evo["color"])) if n.evolved else Color(String(def["color"]))
@@ -830,6 +831,8 @@ func _drop_mine(w: WeaponInst, s: Stats) -> void:
 
 
 func _explode_mine(m: MineUnit) -> void:
+	sfx.play("explosion")
+	game.add_shake(3.0)
 	var def: Dictionary = WeaponData.WEAPONS[m.weapon_id]
 	var evo: Dictionary = def["evo"]
 	var color := Color(String(evo["color"])) if m.evolved else Color(String(def["color"]))

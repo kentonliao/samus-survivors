@@ -46,7 +46,8 @@ PROJECT-STATUS.md 第 5 節的移植訊號已全數成立：
       ——2026-08-12 完成，自動化煙霧測試全過（tests/m3_smoke.gd），待玩家實玩驗收
 - [x] **M4 頭目戰**：4巨型中頭目+QUEEN（攻擊模式/死亡演出/連戰照搬）
       ——2026-08-12 完成，自動化煙霧測試全過（tests/m4_smoke.gd），待玩家實玩驗收
-- **M5 UI/音效**：SM風格 Theme、HUD、卡片、公告、8-bit 音效 wav 化
+- [x] **M5 UI/音效**：SM風格 Theme、HUD、卡片、公告、8-bit 音效 wav 化
+      ——2026-08-12 完成（Hud.gd/Sfx.gd+14wav+畫面震動），截圖驗證通過，音效聽感待玩家實測
 - **M6 新內容**：配樂、收集要素/圖鑑/Meta解鎖、存檔、暫停選單、成就架構
 - **M7 Steam**：Steamworks 整合（godotsteam 外掛）、成就、雲存檔、商店頁素材
 
