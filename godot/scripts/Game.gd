@@ -64,8 +64,15 @@ var banish_left := 3              # 排除次數（每場3次；之後商店系�
 var started := false              # 標題畫面 → 按任意鍵開始
 var title_wait_t := 0.0
 var title_input_ready := false
+var title_sub := ""               # 標題子畫面："" / codex / shop
+var c_prev := false
+var b_prev := false
 var paused := false               # ESC 暫停
 var run_recorded := false         # 本局結果只記一次
+# Meta 統計（本局，結算時寫入存檔）
+var run_kills := {}               # type_id -> 擊殺數
+var run_evos: Array[String] = []  # 本局達成的進化 id
+var run_boss_kills := 0
 
 var rng := RandomNumberGenerator.new()
 
@@ -75,6 +82,7 @@ var boss_sys: BossSystem
 var fx: FxLayer
 var hud: GameHud
 var sfx: Sfx
+var bgm: Bgm
 
 
 func _ready() -> void:
@@ -97,10 +105,13 @@ func _ready() -> void:
 	add_child(boss_sys)
 	sfx = Sfx.new()
 	add_child(sfx)
+	bgm = Bgm.new()
+	add_child(bgm)
 	hud = GameHud.new()
 	hud.card_picked.connect(_on_card_picked)
 	hud.reroll_requested.connect(_on_reroll)
 	hud.banish_requested.connect(_on_banish)
+	hud.shop_buy.connect(_shop_buy)
 	add_child(hud)
 	weapon_sys.sfx = sfx
 	player.sfx = sfx
@@ -109,12 +120,15 @@ func _ready() -> void:
 	player.reserve_triggered.connect(_on_reserve_triggered)
 	hud.refresh_slots(weapon_sys)
 	_load_settings()
+	_apply_shop_bonus()
 	if skip_title:
 		skip_title = false
 		started = true
+		bgm.play_track("battle")
 	else:
 		player.set_process(false)
 		hud.show_title(_best_line())
+		bgm.play_track("title")
 
 
 func _process(delta: float) -> void:
@@ -122,16 +136,34 @@ func _process(delta: float) -> void:
 	var m_now := Input.is_physical_key_pressed(KEY_M)
 	if m_now and not m_prev:
 		var mm := sfx.toggle_mute()
+		bgm.set_muted(mm)
 		hud.show_banner("♪ 靜音" if mm else "♪ 音效開啟")
 		_save_settings()
 	m_prev = m_now
-	# 標題畫面：按任意鍵開始
+	# 標題畫面：按任意鍵開始；C 圖鑑、B 補給站
 	if not started:
+		var esc_t := Input.is_physical_key_pressed(KEY_ESCAPE)
+		if title_sub != "":
+			# 子畫面開啟中：ESC 關閉返回標題
+			if esc_t and not esc_prev:
+				_close_title_sub()
+			esc_prev = esc_t
+			return
+		esc_prev = esc_t
 		title_wait_t += delta
 		if not Input.is_anything_pressed():
 			title_input_ready = true
-		if title_wait_t > 0.3 and title_input_ready and Input.is_anything_pressed():
+		var c_now := Input.is_physical_key_pressed(KEY_C)
+		var b_now := Input.is_physical_key_pressed(KEY_B)
+		if c_now and not c_prev:
+			_open_codex()
+		elif b_now and not b_prev:
+			_open_shop()
+		elif title_wait_t > 0.3 and title_input_ready and Input.is_anything_pressed() \
+				and not c_now and not b_now and not esc_t:
 			_start_game()
+		c_prev = c_now
+		b_prev = b_now
 		return
 	if dead or victorious:
 		if Input.is_physical_key_pressed(KEY_R):
@@ -223,6 +255,25 @@ func _start_game() -> void:
 	hud.hide_title()
 	player.set_process(true)
 	sfx.play("select")
+	bgm.play_track("battle")
+
+
+func _open_codex() -> void:
+	title_sub = "codex"
+	sfx.play("select")
+	hud.show_codex(_codex_data())
+
+
+func _open_shop() -> void:
+	title_sub = "shop"
+	sfx.play("select")
+	hud.show_shop(_shop_data())
+
+
+func _close_title_sub() -> void:
+	title_sub = ""
+	sfx.play("select")
+	hud.hide_title_sub()
 
 
 func _set_paused(p: bool) -> void:
@@ -243,6 +294,14 @@ func _on_menu_action(action: String) -> void:
 			get_tree().reload_current_scene()
 		"title":
 			get_tree().reload_current_scene()
+		"codex":
+			if not started:
+				_open_codex()
+		"shop":
+			if not started:
+				_open_shop()
+		"back":
+			_close_title_sub()
 
 
 # ---------- 存檔（設定＋最佳紀錄）----------
@@ -251,6 +310,7 @@ func _load_settings() -> void:
 	if cfg.load(SAVE_PATH) != OK:
 		return
 	sfx.muted = bool(cfg.get_value("settings", "muted", false))
+	bgm.muted = sfx.muted
 
 
 func _save_settings() -> void:
@@ -271,9 +331,10 @@ func _best_line() -> String:
 	return "最佳存活 %02d:%02d｜最高 LV %d｜通關 %d／出擊 %d 次" % [bt / 60, bt % 60, bl, wins, runs]
 
 
-func _record_run(victory: bool) -> void:
+func _record_run(victory: bool) -> int:
+	# 寫入戰績/圖鑑/進化收集/Meta貨幣，回傳本局獲得的結晶碎片
 	if run_recorded:
-		return
+		return 0
 	run_recorded = true
 	var cfg := ConfigFile.new()
 	cfg.load(SAVE_PATH)
@@ -282,7 +343,68 @@ func _record_run(victory: bool) -> void:
 	cfg.set_value("records", "best_level", maxi(int(cfg.get_value("records", "best_level", 1)), level))
 	if victory:
 		cfg.set_value("records", "victories", int(cfg.get_value("records", "victories", 0)) + 1)
+	for id in run_kills:
+		cfg.set_value("codex", String(id), int(cfg.get_value("codex", String(id), 0)) + int(run_kills[id]))
+	var evos: Array = cfg.get_value("meta", "evos", [])
+	for eid in run_evos:
+		if not evos.has(eid):
+			evos.append(eid)
+	cfg.set_value("meta", "evos", evos)
+	var earned := level + run_boss_kills * 5 + (25 if victory else 0)
+	cfg.set_value("meta", "shards", int(cfg.get_value("meta", "shards", 0)) + earned)
 	cfg.save(SAVE_PATH)
+	return earned
+
+
+# ---------- Meta：圖鑑 / 補給站 ----------
+const SHOP_PRICES := [60, 120, 240]   # 各升級第1/2/3級價格
+
+func _apply_shop_bonus() -> void:
+	var cfg := ConfigFile.new()
+	cfg.load(SAVE_PATH)
+	reroll_left = 3 + int(cfg.get_value("meta", "shop_reroll", 0))
+	banish_left = 3 + int(cfg.get_value("meta", "shop_banish", 0))
+
+
+func _codex_data() -> Dictionary:
+	var cfg := ConfigFile.new()
+	cfg.load(SAVE_PATH)
+	var kills := {}
+	for id in ["zeela", "skree", "ripper", "reo", "puyo", "sciser", "rinka", "metroid",
+			"kraid", "crocomire", "phantoon", "ridley", "queen"]:
+		kills[id] = int(cfg.get_value("codex", id, 0))
+	return {"kills": kills, "evos": cfg.get_value("meta", "evos", [])}
+
+
+func _shop_data() -> Dictionary:
+	var cfg := ConfigFile.new()
+	cfg.load(SAVE_PATH)
+	var r_lvl := int(cfg.get_value("meta", "shop_reroll", 0))
+	var b_lvl := int(cfg.get_value("meta", "shop_banish", 0))
+	return {
+		"shards": int(cfg.get_value("meta", "shards", 0)),
+		"reroll_lvl": r_lvl,
+		"banish_lvl": b_lvl,
+		"reroll_price": SHOP_PRICES[r_lvl] if r_lvl < 3 else 0,
+		"banish_price": SHOP_PRICES[b_lvl] if b_lvl < 3 else 0,
+	}
+
+
+func _shop_buy(item: String) -> void:
+	var cfg := ConfigFile.new()
+	cfg.load(SAVE_PATH)
+	var key := "shop_" + item
+	var lvl := int(cfg.get_value("meta", key, 0))
+	var shards := int(cfg.get_value("meta", "shards", 0))
+	if lvl >= 3 or shards < SHOP_PRICES[lvl]:
+		sfx.play("hit")
+		return
+	cfg.set_value("meta", key, lvl + 1)
+	cfg.set_value("meta", "shards", shards - SHOP_PRICES[lvl])
+	cfg.save(SAVE_PATH)
+	sfx.play("select")
+	_apply_shop_bonus()
+	hud.show_shop(_shop_data())   # 刷新顯示
 
 
 func _begin_announce(action: String, min_t: float) -> void:
@@ -308,8 +430,10 @@ func _finish_announce() -> void:
 		"midboss":
 			boss_sys.start_boss_battle(announce_entry)
 			announce_entry = {}
+			bgm.play_track("boss")
 		"queen":
 			boss_sys.spawn_final_boss()
+			bgm.play_track("boss")
 	_proceed_after_menus()
 
 
@@ -372,6 +496,7 @@ func _spawn_enemy(d: Array) -> void:
 	var t: Array = ENEMY_TYPES[chosen]
 	var elite := elapsed > 480.0 and rng.randf() < minf(0.32, 0.1 + (elapsed - 480.0) / 2600.0)
 	var e := EnemyUnit.new()
+	e.type_id = chosen
 	var hp_m := 2.2 if elite else 1.0
 	var dmg_m := 1.6 if elite else 1.0
 	e.hp = t[1] * d[0] * hp_m
@@ -479,11 +604,17 @@ func kill_enemy(idx: int) -> void:
 		return
 	e.dead = true
 	enemies.remove_at(idx)  # 先移除再做死亡效果：防自爆蟲互殺無限遞迴（HTML v0.9教訓）
+	if e.type_id != "":
+		run_kills[e.type_id] = int(run_kills.get(e.type_id, 0)) + 1   # 圖鑑統計
+	if e.is_boss:
+		run_boss_kills += 1
 	if e == boss_sys.boss_battle:
-		# 頭目戰結束：清空敵方彈幕、恢復雜兵生產
+		# 頭目戰結束：清空敵方彈幕、恢復雜兵生產、切回戰鬥曲
 		boss_sys.boss_battle = null
 		boss_sys.enemy_projectiles.clear()
 		sfx.play("bosskill")
+		if not e.is_final_boss:
+			bgm.play_track("battle")
 	fx.spawn_burst(e.position, Color("#ffe066") if e.is_boss else (Color("#c58bff") if e.flyer else Color("#ffd76a")), 60 if e.is_boss else 10, 260.0 if e.is_boss else 140.0, 0.9 if e.is_boss else 0.4)
 	if e.is_final_boss:
 		fx.spawn_burst(e.position, Color("#1e9628"), 80, 300.0, 1.2)
@@ -654,6 +785,9 @@ func _proceed_after_menus() -> void:
 func _show_evolution(w: WeaponSystem.WeaponInst) -> void:
 	var def: Dictionary = WeaponData.WEAPONS[w.id]
 	var evo: Dictionary = def["evo"]
+	var evo_id := String(evo["id"])
+	if not run_evos.has(evo_id):
+		run_evos.append(evo_id)   # 圖鑑：進化收集
 	hud.show_evolution(w.id, String(evo["name"]), String(evo["desc"]))
 	_begin_announce("", 0.5)
 	sfx.play("evolve")
@@ -691,19 +825,21 @@ func _show_boss_announce(title: String, flavor: String, action: String, entry: D
 
 func _trigger_victory() -> void:
 	victorious = true
+	bgm.stop_music()
 	sfx.play("victory")
-	_record_run(true)
+	var earned := _record_run(true)
 	var m := int(elapsed) / 60
 	var s := int(elapsed) % 60
-	hud.show_victory("存活 %02d:%02d｜LV %d｜%s" % [m, s, level, String(SUIT_LABELS[player.suit])])
+	hud.show_victory("存活 %02d:%02d｜LV %d｜%s\n獲得結晶碎片 +%d" % [m, s, level, String(SUIT_LABELS[player.suit]), earned])
 	player.set_process(false)
 
 
 func _game_over() -> void:
 	dead = true
+	bgm.stop_music()
 	sfx.play("gameover")
-	_record_run(false)
+	var earned := _record_run(false)
 	var m := int(elapsed) / 60
 	var s := int(elapsed) % 60
-	hud.show_dead("存活 %02d:%02d｜LV %d｜進化 %d 把" % [m, s, level, weapon_sys.evolved_count()])
+	hud.show_dead("存活 %02d:%02d｜LV %d｜進化 %d 把\n獲得結晶碎片 +%d" % [m, s, level, weapon_sys.evolved_count(), earned])
 	player.set_process(false)

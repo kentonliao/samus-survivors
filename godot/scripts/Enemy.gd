@@ -20,6 +20,7 @@ var slow_timer := 0.0
 var frozen_timer := 0.0    # 絕對零度凍結
 var freeze_cd := 0.0       # 巨型頭目防永凍冷卻
 var drain := false         # Metroid幼體：接觸吸血
+var type_id := ""          # 圖鑑統計用（zeela/…/kraid/queen/metroid）
 var spr: Sprite2D
 
 # ---- 巨型頭目欄位（M4，非頭目維持預設值） ----

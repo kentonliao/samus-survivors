@@ -87,6 +87,7 @@ func start_boss_battle(entry: Dictionary) -> void:
 	b.is_boss = true
 	b.giant = true
 	b.boss_name = String(entry["name"])
+	b.type_id = String(entry["tex"]).replace("enemy_", "")
 	b.side = side
 	b.position = Vector2((Game.W + wpx * 0.7) if side == "right" else (-wpx * 0.7), base_y)
 	b.base_x = anchor_x
@@ -130,6 +131,7 @@ func spawn_final_boss() -> void:
 	b.giant = true
 	b.is_final_boss = true
 	b.boss_name = "QUEEN METROID"
+	b.type_id = "queen"
 	b.side = "top"
 	b.position = Vector2(Game.W / 2.0, -hpx * 0.7)
 	b.target_pos = Vector2(Game.W / 2.0, hpx * 0.42 + 10.0)
@@ -160,6 +162,7 @@ func spawn_final_boss() -> void:
 func spawn_metroid(pos: Vector2) -> void:
 	var d := game.difficulty(game.elapsed)
 	var e := EnemyUnit.new()
+	e.type_id = "metroid"
 	e.position = pos
 	e.radius = 15.0
 	e.hp = 130.0 * float(d[0])

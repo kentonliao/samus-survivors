@@ -9,7 +9,15 @@ extends CanvasLayer
 signal card_picked(card: Dictionary)
 signal reroll_requested
 signal banish_requested(card: Dictionary)
-signal menu_action(action: String)   # resume / restart / title（暫停與結算選單共用）
+signal menu_action(action: String)   # resume / restart / title / codex / shop / back
+signal shop_buy(item: String)        # reroll / banish
+
+const ENEMY_NAMES := {
+	"zeela": "ZEELA", "skree": "SKREE", "ripper": "RIPPER", "reo": "REO",
+	"puyo": "PUYO", "sciser": "SCISER", "rinka": "RINKA", "metroid": "METROID",
+	"kraid": "KRAID", "crocomire": "CROCOMIRE", "phantoon": "PHANTOON",
+	"ridley": "RIDLEY", "queen": "QUEEN",
+}
 
 const W := 960.0
 const H := 540.0
@@ -103,6 +111,10 @@ var title_overlay: Control
 var title_best: Label
 var title_hint: Label
 var pause_overlay: Control
+var codex_overlay: Control
+var codex_box: VBoxContainer
+var shop_overlay: Control
+var shop_box: VBoxContainer
 # 變身 cut-in（玩家提供立繪 ref/cut-in.jpg 去背）
 var cutin_layer: Control
 var cutin_dim: ColorRect
@@ -516,6 +528,12 @@ func _build() -> void:
 	title_hint = _label("▼ 按任意鍵出擊", 17, Color.WHITE)
 	title_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ti_box.add_child(title_hint)
+	var ti_btns := HBoxContainer.new()
+	ti_btns.add_theme_constant_override("separation", 16)
+	ti_btns.alignment = BoxContainer.ALIGNMENT_CENTER
+	ti_btns.add_child(_menu_button("生物圖鑑（C）", "codex"))
+	ti_btns.add_child(_menu_button("補給站（B）", "shop"))
+	ti_box.add_child(ti_btns)
 	var ti_controls := _label("WASD / 方向鍵 移動｜ESC 暫停｜M 靜音", 11, C_TEXT_DIM)
 	ti_controls.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ti_box.add_child(ti_controls)
@@ -539,6 +557,24 @@ func _build() -> void:
 	pa_box.add_child(_wrap_center(_menu_button("繼續（ESC）", "resume")))
 	pa_box.add_child(_wrap_center(_menu_button("重新開始", "restart")))
 	pa_box.add_child(_wrap_center(_menu_button("回到標題", "title")))
+	# 生物圖鑑（標題子畫面，內容開啟時重建）
+	codex_overlay = _overlay_base(Color(0.012, 0.004, 0.024, 1.0), GRID_PURPLE)
+	var cx_center := CenterContainer.new()
+	cx_center.size = Vector2(W, H)
+	codex_overlay.add_child(cx_center)
+	codex_box = VBoxContainer.new()
+	codex_box.add_theme_constant_override("separation", 14)
+	codex_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	cx_center.add_child(codex_box)
+	# 補給站（標題子畫面，內容開啟時重建）
+	shop_overlay = _overlay_base(Color(0.012, 0.004, 0.024, 1.0), GRID_PURPLE)
+	var sh_center := CenterContainer.new()
+	sh_center.size = Vector2(W, H)
+	shop_overlay.add_child(sh_center)
+	shop_box = VBoxContainer.new()
+	shop_box.add_theme_constant_override("separation", 14)
+	shop_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	sh_center.add_child(shop_box)
 	# 變身 cut-in（白閃之下、其他overlay之上）
 	cutin_layer = Control.new()
 	cutin_layer.size = Vector2(W, H)
@@ -816,6 +852,128 @@ func show_title(best_line: String) -> void:
 
 func hide_title() -> void:
 	title_overlay.visible = false
+
+
+func _enemy_tex(id: String) -> Texture2D:
+	var path := "res://assets/boss_queen.png" if id == "queen" else "res://assets/enemy_%s.png" % id
+	if ResourceLoader.exists(path):
+		return load(path)
+	return null
+
+
+func show_codex(data: Dictionary) -> void:
+	for c in codex_box.get_children():
+		c.queue_free()
+	var kills: Dictionary = data["kills"]
+	var evos: Array = data["evos"]
+	var title := _panel_label("生 物 圖 鑑", 22, Color("#180c00"), C_ORANGE, Color.BLACK)
+	codex_box.add_child(_wrap_center(title))
+	# 敵人格：7雜兵+幼體 / 4頭目+皇后 兩排
+	var grid := GridContainer.new()
+	grid.columns = 7
+	grid.add_theme_constant_override("h_separation", 14)
+	grid.add_theme_constant_override("v_separation", 10)
+	for id in ["zeela", "skree", "ripper", "reo", "puyo", "sciser", "rinka",
+			"metroid", "kraid", "crocomire", "phantoon", "ridley", "queen"]:
+		var n := int(kills.get(id, 0))
+		var cell := VBoxContainer.new()
+		cell.add_theme_constant_override("separation", 2)
+		cell.alignment = BoxContainer.ALIGNMENT_CENTER
+		var tr := TextureRect.new()
+		tr.texture = _enemy_tex(id)
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		tr.custom_minimum_size = Vector2(52, 44)
+		cell.add_child(tr)
+		var nm := _label(String(ENEMY_NAMES.get(id, id)), 10, C_TEXT if n > 0 else C_TEXT_DIM, false)
+		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cell.add_child(nm)
+		var kl := _label("擊殺 %d" % n if n > 0 else "未遭遇", 10, C_GREEN if n > 0 else C_TEXT_DIM, false)
+		kl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cell.add_child(kl)
+		if n == 0:
+			cell.modulate = Color(0.45, 0.45, 0.5)
+		grid.add_child(cell)
+	codex_box.add_child(_wrap_center(grid))
+	# 進化收集
+	var evo_title := _label("武器進化收集  %d / 12" % evos.size(), 14, C_GOLD)
+	evo_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	codex_box.add_child(evo_title)
+	var evo_row := HBoxContainer.new()
+	evo_row.add_theme_constant_override("separation", 8)
+	evo_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	for wid in WeaponData.WEAPON_ORDER:
+		var wdef: Dictionary = WeaponData.WEAPONS[wid]
+		var wevo: Dictionary = wdef["evo"]
+		var got: bool = evos.has(String(wevo["id"]))
+		var ic := _icon_rect(wid, 28.0)
+		if not got:
+			ic.modulate = Color(0.25, 0.25, 0.3)
+		evo_row.add_child(ic)
+	codex_box.add_child(_wrap_center(evo_row))
+	codex_box.add_child(_wrap_center(_menu_button("返回（ESC）", "back")))
+	codex_overlay.visible = true
+
+
+func show_shop(data: Dictionary) -> void:
+	for c in shop_box.get_children():
+		c.queue_free()
+	var title := _panel_label("補 給 站", 22, Color("#180c00"), C_ORANGE, Color.BLACK)
+	shop_box.add_child(_wrap_center(title))
+	var shards := _label("結晶碎片：%d" % int(data["shards"]), 16, C_GOLD)
+	shards.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	shop_box.add_child(shards)
+	var hint := _label("出擊獲得碎片：每 1 等級 +1、頭目 +5、通關 +25", 11, C_TEXT_DIM)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	shop_box.add_child(hint)
+	shop_box.add_child(_wrap_center(_shop_row("重選次數上限 +1", "每場升級選單可重選次數", "reroll",
+		int(data["reroll_lvl"]), int(data["reroll_price"]), int(data["shards"]))))
+	shop_box.add_child(_wrap_center(_shop_row("排除次數上限 +1", "每場可排除卡池項目次數", "banish",
+		int(data["banish_lvl"]), int(data["banish_price"]), int(data["shards"]))))
+	shop_box.add_child(_wrap_center(_menu_button("返回（ESC）", "back")))
+	shop_overlay.visible = true
+
+
+func _shop_row(name_text: String, desc: String, item: String, lvl: int, price: int, shards: int) -> Panel:
+	var p := Panel.new()
+	p.custom_minimum_size = Vector2(560, 74)
+	var sb := _sb(Color(0.03, 0.015, 0.06, 0.9), Color("#8a48d8"), 2, Color(0, 0, 0, 0), 0, Vector2.ZERO)
+	p.add_theme_stylebox_override("panel", sb)
+	var nm := _label(name_text, 15, C_TEXT, false)
+	nm.position = Vector2(14, 8)
+	p.add_child(nm)
+	var ds := _label(desc + "（已購 %d / 3）" % lvl, 11, C_TEXT_DIM, false)
+	ds.position = Vector2(14, 36)
+	p.add_child(ds)
+	var btn := Button.new()
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.position = Vector2(420, 14)
+	btn.custom_minimum_size = Vector2(120, 44)
+	if lvl >= 3:
+		btn.text = "已滿級"
+		btn.disabled = true
+	else:
+		btn.text = "%d 碎片" % price
+		btn.disabled = shards < price
+	btn.add_theme_font_size_override("font_size", 14)
+	var bsb := _sb(Color(0.1, 0.06, 0.01, 0.9), C_ORANGE_DK, 2, Color(0, 0, 0, 0), 0, Vector2.ZERO)
+	btn.add_theme_stylebox_override("normal", bsb)
+	var bsb_h := _sb(Color(0.2, 0.12, 0.02, 0.95), C_ORANGE, 2, Color(0.91, 0.627, 0.125, 0.4), 5, Vector2.ZERO)
+	btn.add_theme_stylebox_override("hover", bsb_h)
+	btn.add_theme_color_override("font_color", C_ORANGE)
+	btn.pressed.connect(_on_shop_buy.bind(item))
+	p.add_child(btn)
+	return p
+
+
+func _on_shop_buy(item: String) -> void:
+	shop_buy.emit(item)
+
+
+func hide_title_sub() -> void:
+	codex_overlay.visible = false
+	shop_overlay.visible = false
 
 
 func show_pause() -> void:
