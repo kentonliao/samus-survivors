@@ -92,7 +92,7 @@ body {
 		</style>
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
-
+<style>#rotate-hint{position:fixed;inset:0;background:#030106;color:#e8a020;display:none;z-index:9999;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;font-size:20px;font-family:sans-serif}@media (orientation:portrait) and (pointer:coarse){#rotate-hint{display:flex}}#rotate-hint .ph{font-size:64px;animation:rh 1.6s ease-in-out infinite}@keyframes rh{0%,20%{transform:rotate(0)}60%,100%{transform:rotate(90deg)}}</style><script>addEventListener('DOMContentLoaded',function(){var d=document.createElement('div');d.id='rotate-hint';d.innerHTML='<div class=ph>📱</div><div>請將手機轉為橫向遊玩<br><span style=color:#9aa4b8;font-size:14px>Rotate to landscape</span></div>';document.body.appendChild(d);d.addEventListener('touchend',function(){var el=document.documentElement;if(el.requestFullscreen){el.requestFullscreen().then(function(){if(screen.orientation&&screen.orientation.lock){screen.orientation.lock('landscape').catch(function(){})}}).catch(function(){})}});});</script>
 	</head>
 	<body>
 		<canvas id="canvas">

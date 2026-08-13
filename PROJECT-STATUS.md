@@ -603,6 +603,13 @@
        +反鋸齒關閉——一石二鳥把「中文像素字型」老待辦一併解決，
        全UI（含英文標題）變像素字型、桌面版同步受益。pck 4.27→5.19MB。
        **教訓：Web匯出沒有系統字型，任何非ASCII文字都必須打包字型**
+16. [x] ~~手機直式畫面太小~~ → M6c-fix2 完成（2026-08-12）：瀏覽器無法直接強制
+       橫向（iOS完全不允許、Android僅全螢幕下可鎖），採標準雙管做法——
+       export preset `html/head_include` 注入：①CSS media query
+       `(orientation:portrait) and (pointer:coarse)` 顯示全螢幕「請轉橫向📱」提示
+       （桌面窄視窗不觸發）；②點提示時 Android 嘗試 requestFullscreen+
+       screen.orientation.lock('landscape')（iOS忽略，實體轉向後提示自動消失）。
+       行動瀏覽器模擬驗證：直式顯示/橫式隱藏皆正確
   **下一步候選**：近戰武器頭目戰調整（待辦9b，玩家要先想）、輔助能力有感化（待辦9）、
   特效sprite化（待辦13ⓑ）、平衡輪、或 M7 Steam 進程（Steamworks整合）。
   HTML 版此後只修bug不加功能。開發循環：Claude寫檔→玩家Godot按F5→回報。

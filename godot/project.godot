@@ -24,9 +24,9 @@ window/stretch/mode="canvas_items"
 
 [gui]
 
-theme/custom_font="res://assets/fonts/Cubic_11.ttf"
 theme/default_font_antialiasing=0
 theme/default_font_subpixel_positioning=0
+theme/custom_font="res://assets/fonts/Cubic_11.ttf"
 
 [rendering]
 
