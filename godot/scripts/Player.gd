@@ -66,6 +66,28 @@ func set_suit(tier: String) -> void:
 	anim.play(current)
 
 
+var touch_idx := -1          # 觸控虛擬搖桿（手機Web版）：拖曳方向=移動方向
+var touch_origin := Vector2.ZERO
+var touch_dir := Vector2.ZERO
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch:
+		var te := event as InputEventScreenTouch
+		if te.pressed and touch_idx == -1:
+			touch_idx = te.index
+			touch_origin = te.position
+			touch_dir = Vector2.ZERO
+		elif not te.pressed and te.index == touch_idx:
+			touch_idx = -1
+			touch_dir = Vector2.ZERO
+	elif event is InputEventScreenDrag:
+		var de := event as InputEventScreenDrag
+		if de.index == touch_idx:
+			var v := de.position - touch_origin
+			touch_dir = v.normalized() if v.length() > 14.0 else Vector2.ZERO
+
+
 func _process(delta: float) -> void:
 	var dir := Vector2.ZERO
 	if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):
@@ -76,6 +98,8 @@ func _process(delta: float) -> void:
 		dir.y -= 1
 	if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):
 		dir.y += 1
+	if dir == Vector2.ZERO and touch_dir != Vector2.ZERO:
+		dir = touch_dir
 
 	if invul > 0.0:
 		invul -= delta

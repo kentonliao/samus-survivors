@@ -534,7 +534,10 @@ func _build() -> void:
 	ti_btns.add_child(_menu_button("生物圖鑑（C）", "codex"))
 	ti_btns.add_child(_menu_button("補給站（B）", "shop"))
 	ti_box.add_child(ti_btns)
-	var ti_controls := _label("WASD / 方向鍵 移動｜ESC 暫停｜M 靜音", 11, C_TEXT_DIM)
+	var controls_text := "WASD / 方向鍵 移動｜ESC 暫停｜M 靜音"
+	if DisplayServer.is_touchscreen_available():
+		controls_text = "拖曳畫面移動｜點擊繼續與選卡"   # 手機Web版
+	var ti_controls := _label(controls_text, 11, C_TEXT_DIM)
 	ti_controls.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ti_box.add_child(ti_controls)
 	var ti_ver := _label(Game.GAME_VERSION, 10, C_TEXT_DIM)

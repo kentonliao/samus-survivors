@@ -575,8 +575,29 @@
   ④測試：`m6b_smoke.gd`（BGM/圖鑑/碎片/購買持久化全驗，**含存檔備份還原機制**——
   測試會動真實存檔，備份→清空→測→還原；早期測試留下的污染已手動清除，
   玩家從乾淨存檔開始）＋全迴歸PASS＋`m6b_shots.gd`截圖確認。
+  **M6b 驗收（2026-08-12）**：「集大成，太感動了，全部OK」。
+  頭目曲回饋：希望更緊湊緊張→記入待辦14。
+  **M6c 完成（2026-08-12）**：Web 匯出上線——Godot 版現在朋友可玩！
+  ①匯出模板 4.7.1 已裝（%APPDATA%\Godot\export_templates\4.7.1.stable\，
+  含 Windows 模板供未來 Steam 用；tpz 下載腳本見對話）；
+  ②`godot/export_presets.cfg` Web preset：**thread_support=false（單執行緒）**
+  ——GitHub Pages 不送 COOP/COEP 標頭，多執行緒版需 SharedArrayBuffer 會直接掛，
+  單執行緒版免特殊標頭且 iOS Safari 相容（音訊延遲略高可接受）；
+  ③輸出到 repo 根目錄 `/play/`（wasm 39.5MB+pck 4.3MB，低於 GitHub 100MB 限制），
+  **線上網址：https://kentonliao.github.io/samus-survivors/play/**
+  （根目錄 index.html 仍是舊 HTML 試玩版，兩版並存）；
+  ④觸控支援：Player 虛擬搖桿（拖曳畫面任意處=移動方向，死區14px）、
+  標題操作說明依 is_touchscreen_available 切換文案；點擊經「touch模擬mouse」
+  （專案預設開）覆蓋按任意鍵/選卡/按鈕。**手機注意**：無ESC暫停鈕（待補）、
+  低階手機效能未測；⑤本地驗證：python http.server + 瀏覽器實測引擎啟動
+  （single-threaded/WebGL2 零錯誤、canvas渲染、載入畫面正常收起）。
+  **匯出流程（之後重發布照做）**：改完程式 → `godot --headless --export-release
+  "Web" "../play/index.html"` → git push → Pages 約1分鐘自動部署。
+14. [ ] **頭目戰配樂更緊湊緊張（玩家 2026-08-12 M6b 驗收提出）**：現版不差但想更緊；
+       方向：BPM 158→170+、низ音改十六分半音下行、加不和諧半音踩點、
+       鼓組加倍密度/加碎鼓過門（bgm_gen.py boss() 段落可調）
   **下一步候選**：近戰武器頭目戰調整（待辦9b，玩家要先想）、輔助能力有感化（待辦9）、
-  特效sprite化（待辦13ⓑ）、平衡輪、或 M7 Steam 進程（匯出設定/Steamworks）。
+  特效sprite化（待辦13ⓑ）、平衡輪、或 M7 Steam 進程（Steamworks整合）。
   HTML 版此後只修bug不加功能。開發循環：Claude寫檔→玩家Godot按F5→回報。
   **提醒玩家**：編輯器開著時經歷了本輪改動，記得「專案→重新載入目前專案」。
   **v1.9.2（第二十一輪）**：①絕對零度改為持續射線（evo加category:'beam_continuous'+range:300，
