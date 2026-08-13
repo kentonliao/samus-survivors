@@ -1,5 +1,13 @@
 # Samus Survivors — 專案進度交接文件
 
+> **🏁 本專案已封存（2026-08-12，git tag `tribute-v1.0`）**：致敬版開發完成——
+> Godot 移植 M0~M6c 全部完成（武器/頭目/UI/音效/配樂/圖鑑/商店/Web版/觸控），
+> 玩家驗收「集大成」。此 repo 此後只做 bug 修復，Pages 網頁版持續供朋友遊玩
+> （/play/ = Godot版、根目錄 = 舊HTML版）。
+> **後續開發移至新專案 `C:\Users\kento\OneDrive\桌面\ProjectNova`**（工作代號，
+> 正式名稱待世界觀定案）：以本專案程式碼為基礎全面原創化（世界觀/角色/敵人/名稱），
+> 目標 Steam 上架。接續開發請到新資料夾讀該處的 PROJECT-STATUS.md。
+
 > **使用方式（2026-08-10 起改用 Claude Code）**：專案已整個搬進資料夾
 > `C:\Users\kento\OneDrive\桌面\Samus Survivors`，並改用 Claude Code 直接在此資料夾內開發。
 > 新開對話時只要說「讀 PROJECT-STATUS.md 接續開發」，Claude 就能自己讀取這份文件與最新程式碼，
