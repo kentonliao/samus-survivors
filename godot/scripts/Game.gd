@@ -4,10 +4,14 @@ extends Node2D
 ## ＋ SM風格HUD（Hud.gd）＋ 8-bit音效（Sfx.gd）＋ 畫面震動
 ## 中央迴圈驅動所有實體陣列（HTML版同構移植）
 
+const GAME_VERSION := "Godot M6a · 2026-08-12 · 標題/暫停/存檔"
+const SAVE_PATH := "user://save.cfg"
 const W := 960.0
 const H := 540.0
 const MAX_ENEMIES := 600
 const GEM_CAP := 45
+
+static var skip_title := false   # 「再次挑戰」重載場景時跳過標題直接開打
 
 const SUIT_LABELS := {"power": "POWER SUIT", "varia": "VARIA SUIT", "gravity": "GRAVITY SUIT", "hyper": "HYPER MODE"}
 const SUIT_HIGHLIGHT := {"power": "#eef30c", "varia": "#ffcf3d", "gravity": "#4fd8ff", "hyper": "#ffffff"}
@@ -53,9 +57,15 @@ var final_boss_triggered := false # 只觸發一次
 var victorious := false
 var shake_amt := 0.0              # 畫面震動強度（爆炸/頭目死亡/變身）
 var m_prev := false               # M鍵靜音去彈跳
+var esc_prev := false             # ESC暫停去彈跳
 var pending_cutin := ""           # 待播放的變身 cut-in（動力服tier）
 var reroll_left := 3              # 升級選單重選次數（每場3次）
 var banish_left := 3              # 排除次數（每場3次；之後商店系統可加購）
+var started := false              # 標題畫面 → 按任意鍵開始
+var title_wait_t := 0.0
+var title_input_ready := false
+var paused := false               # ESC 暫停
+var run_recorded := false         # 本局結果只記一次
 
 var rng := RandomNumberGenerator.new()
 
@@ -94,21 +104,50 @@ func _ready() -> void:
 	add_child(hud)
 	weapon_sys.sfx = sfx
 	player.sfx = sfx
+	hud.menu_action.connect(_on_menu_action)
 	weapon_sys.add_weapon("powerBeam")   # 初始武器
 	player.reserve_triggered.connect(_on_reserve_triggered)
 	hud.refresh_slots(weapon_sys)
+	_load_settings()
+	if skip_title:
+		skip_title = false
+		started = true
+	else:
+		player.set_process(false)
+		hud.show_title(_best_line())
 
 
 func _process(delta: float) -> void:
-	# M鍵靜音（隨時可按）
+	# M鍵靜音（隨時可按，狀態存檔）
 	var m_now := Input.is_physical_key_pressed(KEY_M)
 	if m_now and not m_prev:
 		var mm := sfx.toggle_mute()
 		hud.show_banner("♪ 靜音" if mm else "♪ 音效開啟")
+		_save_settings()
 	m_prev = m_now
+	# 標題畫面：按任意鍵開始
+	if not started:
+		title_wait_t += delta
+		if not Input.is_anything_pressed():
+			title_input_ready = true
+		if title_wait_t > 0.3 and title_input_ready and Input.is_anything_pressed():
+			_start_game()
+		return
 	if dead or victorious:
 		if Input.is_physical_key_pressed(KEY_R):
-			get_tree().reload_current_scene()
+			_on_menu_action("restart")
+		elif Input.is_physical_key_pressed(KEY_T):
+			_on_menu_action("title")
+		return
+	# ESC 暫停（遊玩中才可；選單/公告中不搶）
+	var esc_now := Input.is_physical_key_pressed(KEY_ESCAPE)
+	if esc_now and not esc_prev:
+		if paused:
+			_set_paused(false)
+		elif not menu_open and announce_state == "":
+			_set_paused(true)
+	esc_prev = esc_now
+	if paused:
 		return
 	if announce_state != "":
 		# 公告期間全場暫停；按任意鍵繼續（玩家要求：不用計時，留足觀看時間）
@@ -176,6 +215,74 @@ func _process(delta: float) -> void:
 
 func add_shake(a: float) -> void:
 	shake_amt = minf(10.0, shake_amt + a)
+
+
+# ---------- 流程：標題/暫停/結算選單 ----------
+func _start_game() -> void:
+	started = true
+	hud.hide_title()
+	player.set_process(true)
+	sfx.play("select")
+
+
+func _set_paused(p: bool) -> void:
+	paused = p
+	player.set_process(not p)
+	if p:
+		hud.show_pause()
+	else:
+		hud.hide_pause()
+
+
+func _on_menu_action(action: String) -> void:
+	match action:
+		"resume":
+			_set_paused(false)
+		"restart":
+			Game.skip_title = true
+			get_tree().reload_current_scene()
+		"title":
+			get_tree().reload_current_scene()
+
+
+# ---------- 存檔（設定＋最佳紀錄）----------
+func _load_settings() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(SAVE_PATH) != OK:
+		return
+	sfx.muted = bool(cfg.get_value("settings", "muted", false))
+
+
+func _save_settings() -> void:
+	var cfg := ConfigFile.new()
+	cfg.load(SAVE_PATH)   # 保留既有紀錄區
+	cfg.set_value("settings", "muted", sfx.muted)
+	cfg.save(SAVE_PATH)
+
+
+func _best_line() -> String:
+	var cfg := ConfigFile.new()
+	if cfg.load(SAVE_PATH) != OK or int(cfg.get_value("records", "runs", 0)) == 0:
+		return "尚無出擊紀錄"
+	var bt := int(cfg.get_value("records", "best_time", 0))
+	var bl := int(cfg.get_value("records", "best_level", 1))
+	var wins := int(cfg.get_value("records", "victories", 0))
+	var runs := int(cfg.get_value("records", "runs", 0))
+	return "最佳存活 %02d:%02d｜最高 LV %d｜通關 %d／出擊 %d 次" % [bt / 60, bt % 60, bl, wins, runs]
+
+
+func _record_run(victory: bool) -> void:
+	if run_recorded:
+		return
+	run_recorded = true
+	var cfg := ConfigFile.new()
+	cfg.load(SAVE_PATH)
+	cfg.set_value("records", "runs", int(cfg.get_value("records", "runs", 0)) + 1)
+	cfg.set_value("records", "best_time", maxi(int(cfg.get_value("records", "best_time", 0)), int(elapsed)))
+	cfg.set_value("records", "best_level", maxi(int(cfg.get_value("records", "best_level", 1)), level))
+	if victory:
+		cfg.set_value("records", "victories", int(cfg.get_value("records", "victories", 0)) + 1)
+	cfg.save(SAVE_PATH)
 
 
 func _begin_announce(action: String, min_t: float) -> void:
@@ -585,6 +692,7 @@ func _show_boss_announce(title: String, flavor: String, action: String, entry: D
 func _trigger_victory() -> void:
 	victorious = true
 	sfx.play("victory")
+	_record_run(true)
 	var m := int(elapsed) / 60
 	var s := int(elapsed) % 60
 	hud.show_victory("存活 %02d:%02d｜LV %d｜%s" % [m, s, level, String(SUIT_LABELS[player.suit])])
@@ -594,6 +702,7 @@ func _trigger_victory() -> void:
 func _game_over() -> void:
 	dead = true
 	sfx.play("gameover")
+	_record_run(false)
 	var m := int(elapsed) / 60
 	var s := int(elapsed) % 60
 	hud.show_dead("存活 %02d:%02d｜LV %d｜進化 %d 把" % [m, s, level, weapon_sys.evolved_count()])

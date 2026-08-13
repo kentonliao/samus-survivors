@@ -1,4 +1,4 @@
-extends SceneTree
+﻿extends SceneTree
 ## M5 UI 視覺驗證（需有視窗執行）：依序擺出五個 UI 狀態並截圖到 scratchpad
 ## godot -s res://tests/m5_shots.gd
 
@@ -10,6 +10,7 @@ var step := 0
 
 
 func _initialize() -> void:
+	Game.skip_title = true   # 測試跳過標題畫面
 	var scene: PackedScene = load("res://scenes/Main.tscn")
 	var inst: Node = scene.instantiate()
 	root.add_child(inst)

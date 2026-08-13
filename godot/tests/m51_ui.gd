@@ -1,4 +1,4 @@
-extends SceneTree
+﻿extends SceneTree
 ## M5.2 排除/重選功能驗證（godot --headless -s res://tests/m51_ui.gd）
 ## 開升級選單 → 按排除鈕（驗證卡池排除+次數-1+選單重開）→ 按重選鈕 → 選卡收單
 
@@ -9,6 +9,7 @@ var banned_id := ""
 
 
 func _initialize() -> void:
+	Game.skip_title = true   # 測試跳過標題畫面
 	var scene: PackedScene = load("res://scenes/Main.tscn")
 	var inst: Node = scene.instantiate()
 	root.add_child(inst)

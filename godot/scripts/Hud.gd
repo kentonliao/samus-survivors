@@ -9,6 +9,7 @@ extends CanvasLayer
 signal card_picked(card: Dictionary)
 signal reroll_requested
 signal banish_requested(card: Dictionary)
+signal menu_action(action: String)   # resume / restart / title（暫停與結算選單共用）
 
 const W := 960.0
 const H := 540.0
@@ -98,6 +99,10 @@ var end_overlay: Control
 var end_title: Label
 var end_stats: Label
 var end_hint: Label
+var title_overlay: Control
+var title_best: Label
+var title_hint: Label
+var pause_overlay: Control
 # 變身 cut-in（玩家提供立繪 ref/cut-in.jpg 去背）
 var cutin_layer: Control
 var cutin_dim: ColorRect
@@ -155,6 +160,8 @@ func _process(delta: float) -> void:
 		evo_hint.modulate.a = 1.0 if tms % 1200 < 600 else 0.2
 	if end_overlay.visible:
 		end_hint.modulate.a = 1.0 if tms % 1200 < 600 else 0.15
+	if title_overlay.visible:
+		title_hint.modulate.a = 1.0 if tms % 1200 < 600 else 0.15
 	# 變身 cut-in 程序動畫：滑入(0.22s)→定格（等任意鍵）→加速滑出(1.4s起)
 	if cutin_t >= 0.0:
 		cutin_t += delta
@@ -197,6 +204,33 @@ func _label(text: String, size: int, color: Color, shadow := true) -> Label:
 		l.add_theme_constant_override("shadow_offset_x", 2)
 		l.add_theme_constant_override("shadow_offset_y", 2)
 	return l
+
+
+func _menu_button(text: String, action: String) -> Button:
+	# 暫停/結算選單按鈕（橘框樣式）
+	var btn := Button.new()
+	btn.text = text
+	btn.add_theme_font_size_override("font_size", 15)
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.custom_minimum_size = Vector2(200, 44)
+	var sb := _sb(Color(0.1, 0.06, 0.01, 0.9), C_ORANGE_DK, 2, Color(0, 0, 0, 0), 0, Vector2.ZERO)
+	btn.add_theme_stylebox_override("normal", sb)
+	var sb_h := _sb(Color(0.2, 0.12, 0.02, 0.95), C_ORANGE, 2, Color(0.91, 0.627, 0.125, 0.4), 5, Vector2.ZERO)
+	btn.add_theme_stylebox_override("hover", sb_h)
+	btn.add_theme_stylebox_override("pressed", sb_h)
+	btn.add_theme_color_override("font_color", C_ORANGE)
+	btn.pressed.connect(_on_menu_action.bind(action))
+	return btn
+
+
+func _on_menu_action(action: String) -> void:
+	menu_action.emit(action)
+
+
+func _wrap_center(c: Control) -> CenterContainer:
+	var w := CenterContainer.new()
+	w.add_child(c)
+	return w
 
 
 func _panel_label(text: String, size: int, fg: Color, bg: Color, border: Color) -> Label:
@@ -448,9 +482,63 @@ func _build() -> void:
 	end_stats = _label("", 15, Color.WHITE)
 	end_stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	e_box.add_child(end_stats)
-	end_hint = _label("按 R 再次挑戰", 14, C_TEXT_DIM)
+	end_hint = _label("R 再次挑戰｜T 回到標題", 14, C_TEXT_DIM)
 	end_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	e_box.add_child(end_hint)
+	var end_btns := HBoxContainer.new()
+	end_btns.add_theme_constant_override("separation", 16)
+	end_btns.alignment = BoxContainer.ALIGNMENT_CENTER
+	end_btns.add_child(_menu_button("再次挑戰", "restart"))
+	end_btns.add_child(_menu_button("回到標題", "title"))
+	e_box.add_child(end_btns)
+	# 標題畫面
+	title_overlay = _overlay_base(Color(0.012, 0.004, 0.024, 1.0), GRID_PURPLE)
+	var ti_center := CenterContainer.new()
+	ti_center.size = Vector2(W, H)
+	title_overlay.add_child(ti_center)
+	var ti_box := VBoxContainer.new()
+	ti_box.add_theme_constant_override("separation", 20)
+	ti_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	ti_center.add_child(ti_box)
+	var ti_title := _panel_label("SAMUS SURVIVORS", 36, Color("#180c00"), C_ORANGE, Color.BLACK)
+	var ti_tc := CenterContainer.new()
+	ti_tc.add_child(ti_title)
+	ti_box.add_child(ti_tc)
+	var ti_sub := _label("類銀河戰士 × 吸血鬼倖存者", 15, C_TEXT_DIM)
+	ti_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ti_box.add_child(ti_sub)
+	var ti_flavor := _label("未知行星的地底深處，孤獨的獵人甦醒。\n擊殺、吸收、進化——直到動力服完全覺醒。", 14, C_TEXT)
+	ti_flavor.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ti_box.add_child(ti_flavor)
+	title_best = _label("", 13, C_GOLD)
+	title_best.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ti_box.add_child(title_best)
+	title_hint = _label("▼ 按任意鍵出擊", 17, Color.WHITE)
+	title_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ti_box.add_child(title_hint)
+	var ti_controls := _label("WASD / 方向鍵 移動｜ESC 暫停｜M 靜音", 11, C_TEXT_DIM)
+	ti_controls.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ti_box.add_child(ti_controls)
+	var ti_ver := _label(Game.GAME_VERSION, 10, C_TEXT_DIM)
+	ti_ver.position = Vector2(12, H - 24)
+	ti_ver.size = Vector2(500, 16)
+	title_overlay.add_child(ti_ver)
+	# 暫停選單
+	pause_overlay = _overlay_base(Color(0.01, 0.0, 0.03, 0.82), GRID_PURPLE)
+	var pa_center := CenterContainer.new()
+	pa_center.size = Vector2(W, H)
+	pause_overlay.add_child(pa_center)
+	var pa_box := VBoxContainer.new()
+	pa_box.add_theme_constant_override("separation", 18)
+	pa_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	pa_center.add_child(pa_box)
+	var pa_title := _panel_label("PAUSED", 24, Color.WHITE, Color(0.05, 0.02, 0.1), C_ORANGE)
+	var pa_tc := CenterContainer.new()
+	pa_tc.add_child(pa_title)
+	pa_box.add_child(pa_tc)
+	pa_box.add_child(_wrap_center(_menu_button("繼續（ESC）", "resume")))
+	pa_box.add_child(_wrap_center(_menu_button("重新開始", "restart")))
+	pa_box.add_child(_wrap_center(_menu_button("回到標題", "title")))
 	# 變身 cut-in（白閃之下、其他overlay之上）
 	cutin_layer = Control.new()
 	cutin_layer.size = Vector2(W, H)
@@ -719,6 +807,23 @@ func show_banner(text: String) -> void:
 func flash_white() -> void:
 	flash_time = 0.6
 	flash_rect.visible = true
+
+
+func show_title(best_line: String) -> void:
+	title_best.text = best_line
+	title_overlay.visible = true
+
+
+func hide_title() -> void:
+	title_overlay.visible = false
+
+
+func show_pause() -> void:
+	pause_overlay.visible = true
+
+
+func hide_pause() -> void:
+	pause_overlay.visible = false
 
 
 func show_victory(stats: String) -> void:

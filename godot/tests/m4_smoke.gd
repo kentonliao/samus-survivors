@@ -1,4 +1,4 @@
-extends SceneTree
+﻿extends SceneTree
 ## M4 煙霧測試（godot --headless -s res://tests/m4_smoke.gd）
 ## 流程：快轉至5分觸發KRAID → 觀察攻擊 → 擊殺（死亡演出+結晶）
 ## → 觸發頭目連戰（CROCOMIRE/PHANTOON/RIDLEY依序）→ QUEEN（酸液/衝擊波/產卵）
@@ -20,6 +20,7 @@ var kraid_killed := false
 
 
 func _initialize() -> void:
+	Game.skip_title = true   # 測試跳過標題畫面
 	var scene: PackedScene = load("res://scenes/Main.tscn")
 	var inst: Node = scene.instantiate()
 	root.add_child(inst)

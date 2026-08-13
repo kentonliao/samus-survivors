@@ -1,4 +1,4 @@
-extends SceneTree
+﻿extends SceneTree
 ## M3 煙霧測試（godot --headless -s res://tests/m3_smoke.gd）
 ## 載入主場景 → 12武器Lv5 → 全部Lv9＋8被動Lv6（觸發12進化＋HYPER變身）
 ## → 快轉模擬，收集各行為類別是否實際運作的旗標，最後輸出報告。
@@ -12,6 +12,7 @@ var xp_timer := 0.0
 
 
 func _initialize() -> void:
+	Game.skip_title = true   # 測試跳過標題畫面
 	var scene: PackedScene = load("res://scenes/Main.tscn")
 	var inst: Node = scene.instantiate()
 	root.add_child(inst)
